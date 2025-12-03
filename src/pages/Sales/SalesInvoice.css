@@ -1,0 +1,145 @@
+/* src/pages/Sales/SalesInvoice.css */
+
+.sales-invoice-page {
+  /* Inherits from layout */
+}
+
+/* Filters Row */
+.filters-row {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.filters-row .search-bar {
+  flex: 1;
+}
+
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filter-select {
+  padding: 10px 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 14px;
+  outline: none;
+  cursor: pointer;
+  min-width: 150px;
+}
+
+.filter-select:focus {
+  border-color: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+}
+
+/* Invoices Table */
+.invoices-table {
+  overflow-x: auto;
+}
+
+.invoices-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.invoices-table thead {
+  background: #f9fafb;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.invoices-table th {
+  padding: 12px 16px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.invoices-table tbody tr {
+  border-bottom: 1px solid #e5e7eb;
+  transition: background 0.2s;
+}
+
+.invoices-table tbody tr:hover {
+  background: #f9fafb;
+}
+
+.invoices-table td {
+  padding: 16px;
+  font-size: 14px;
+  color: #1f2937;
+}
+
+.date-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+/* Status Badges */
+.status-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.status-draft {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.status-sent {
+  background: #dbeafe;
+  color: #2563eb;
+}
+
+.status-paid {
+  background: #d1fae5;
+  color: #10b981;
+}
+
+.status-overdue {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.status-cancelled {
+  background: #f3f4f6;
+  color: #9ca3af;
+}
+
+/* Action Buttons */
+.btn-view {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.btn-view:hover {
+  background: #e5e7eb;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .filters-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filter-group {
+    width: 100%;
+  }
+
+  .filter-select {
+    width: 100%;
+  }
+}
