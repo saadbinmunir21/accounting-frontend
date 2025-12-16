@@ -1,0 +1,565 @@
+// src/components/Forms/ContactFormModal.jsx
+import React, { useState, useEffect } from 'react';
+import { X, AlertCircle, CheckCircle } from 'lucide-react';
+import { contactAPI } from '../../services/api';
+
+const ContactFormModal = ({
+  show,
+  onClose,
+  onSuccess,
+  initialData = null,
+  defaultType = null // 'customer' or 'supplier' to pre-select
+}) => {
+  const [message, setMessage] = useState({ type: '', text: '' });
+  const [formData, setFormData] = useState({
+    contactName: '',
+    accountNumber: '',
+    email: '',
+    phone: '',
+    website: '',
+    businessRegistrationNumber: '',
+    notes: '',
+    contactType: {
+      isCustomer: defaultType === 'customer' || false,
+      isSupplier: defaultType === 'supplier' || false,
+    },
+    billingAddress: {
+      street: '',
+      city: '',
+      state: '',
+      country: '',
+      postalCode: '',
+    },
+    deliveryAddress: {
+      street: '',
+      city: '',
+      state: '',
+      country: '',
+      postalCode: '',
+    },
+    financialDetails: {
+      bankAccountName: '',
+      bankAccountNumber: '',
+      bankDetails: '',
+      taxIdNumber: '',
+    },
+  });
+  const [sameAsBilling, setSameAsBilling] = useState(false);
+
+  // Initialize form data when initialData or defaultType changes
+  useEffect(() => {
+    if (initialData) {
+      setFormData({
+        contactName: initialData.contactName || '',
+        accountNumber: initialData.accountNumber || '',
+        email: initialData.email || '',
+        phone: initialData.phone || '',
+        website: initialData.website || '',
+        businessRegistrationNumber: initialData.businessRegistrationNumber || '',
+        notes: initialData.notes || '',
+        contactType: initialData.contactType || {
+          isCustomer: false,
+          isSupplier: false,
+        },
+        billingAddress: initialData.billingAddress || {
+          street: '',
+          city: '',
+          state: '',
+          country: '',
+          postalCode: '',
+        },
+        deliveryAddress: initialData.deliveryAddress || {
+          street: '',
+          city: '',
+          state: '',
+          country: '',
+          postalCode: '',
+        },
+        financialDetails: initialData.financialDetails || {
+          bankAccountName: '',
+          bankAccountNumber: '',
+          bankDetails: '',
+          taxIdNumber: '',
+        },
+      });
+    } else {
+      setFormData({
+        contactName: '',
+        accountNumber: '',
+        email: '',
+        phone: '',
+        website: '',
+        businessRegistrationNumber: '',
+        notes: '',
+        contactType: {
+          isCustomer: defaultType === 'customer' || false,
+          isSupplier: defaultType === 'supplier' || false,
+        },
+        billingAddress: {
+          street: '',
+          city: '',
+          state: '',
+          country: '',
+          postalCode: '',
+        },
+        deliveryAddress: {
+          street: '',
+          city: '',
+          state: '',
+          country: '',
+          postalCode: '',
+        },
+        financialDetails: {
+          bankAccountName: '',
+          bankAccountNumber: '',
+          bankDetails: '',
+          taxIdNumber: '',
+        },
+      });
+      setSameAsBilling(false);
+    }
+    setMessage({ type: '', text: '' });
+  }, [initialData, defaultType]);
+
+  // Handle form input changes
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  // Handle checkbox changes for contact type
+  const handleContactTypeChange = (type) => {
+    setFormData((prev) => ({
+      ...prev,
+      contactType: {
+        ...prev.contactType,
+        [type]: !prev.contactType[type],
+      },
+    }));
+  };
+
+  // Handle nested object changes (addresses, financial details)
+  const handleNestedChange = (section, field, value) => {
+    setFormData((prev) => ({
+      ...prev,
+      [section]: {
+        ...prev[section],
+        [field]: value,
+      },
+    }));
+  };
+
+  // Copy billing address to delivery address
+  const handleSameAsBilling = (checked) => {
+    setSameAsBilling(checked);
+    if (checked) {
+      setFormData((prev) => ({
+        ...prev,
+        deliveryAddress: { ...prev.billingAddress },
+      }));
+    }
+  };
+
+  // Submit form (create or update)
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    // Validate at least one contact type is selected
+    if (!formData.contactType.isCustomer && !formData.contactType.isSupplier) {
+      setMessage({ type: 'error', text: 'Please select at least one contact type (Customer or Supplier)' });
+      return;
+    }
+
+    try {
+      let response;
+      if (initialData) {
+        response = await contactAPI.update(initialData._id, formData);
+        setMessage({ type: 'success', text: 'Contact updated successfully!' });
+      } else {
+        response = await contactAPI.create(formData);
+        setMessage({ type: 'success', text: 'Contact created successfully!' });
+      }
+
+      setTimeout(() => {
+        if (onSuccess) {
+          onSuccess(response.data.data || response.data);
+        }
+        onClose();
+      }, 1500);
+    } catch (error) {
+      console.error('Error saving contact:', error);
+      setMessage({ type: 'error', text: error.response?.data?.message || 'Failed to save contact' });
+    }
+  };
+
+  if (!show) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-large w-full max-w-4xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="sticky top-0 bg-white border-b border-secondary-200 px-6 py-4 flex items-center justify-between rounded-t-2xl">
+          <h2 className="text-2xl font-bold text-secondary-900">
+            {initialData ? 'Edit Contact' : 'Add New Contact'}
+          </h2>
+          <button onClick={onClose} className="p-2 hover:bg-secondary-100 rounded-lg transition-colors">
+            <X className="w-6 h-6 text-secondary-600" />
+          </button>
+        </div>
+
+        {/* Message Alert in Modal */}
+        {message.text && (
+          <div className="px-6 pt-4">
+            <div
+              className={`p-4 rounded-lg flex items-start space-x-3 ${
+                message.type === 'success'
+                  ? 'bg-green-50 border border-green-200'
+                  : 'bg-red-50 border border-red-200'
+              }`}
+            >
+              {message.type === 'success' ? (
+                <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+              ) : (
+                <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+              )}
+              <p className={`text-sm ${message.type === 'success' ? 'text-green-800' : 'text-red-800'}`}>
+                {message.text}
+              </p>
+            </div>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit}>
+          <div className="px-6 py-6 space-y-6">
+            {/* Contact Type Selection */}
+            <div className="bg-secondary-50 rounded-lg p-4">
+              <h3 className="text-lg font-semibold text-secondary-900 mb-3">Contact Type</h3>
+              <div className="flex items-center space-x-6">
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.contactType.isCustomer}
+                    onChange={() => handleContactTypeChange('isCustomer')}
+                    className="w-4 h-4 text-primary-600 border-secondary-300 rounded focus:ring-2 focus:ring-primary-500"
+                  />
+                  <span className="text-sm font-medium text-secondary-700">Customer</span>
+                </label>
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.contactType.isSupplier}
+                    onChange={() => handleContactTypeChange('isSupplier')}
+                    className="w-4 h-4 text-primary-600 border-secondary-300 rounded focus:ring-2 focus:ring-primary-500"
+                  />
+                  <span className="text-sm font-medium text-secondary-700">Supplier</span>
+                </label>
+              </div>
+            </div>
+
+            {/* Basic Information */}
+            <div>
+              <h3 className="text-lg font-semibold text-secondary-900 mb-4">Basic Information</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-secondary-700 mb-2">
+                    Contact Name <span className="text-red-600">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="contactName"
+                    value={formData.contactName}
+                    onChange={handleInputChange}
+                    required
+                    className="w-full px-4 py-2.5 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-secondary-900"
+                    placeholder="Enter contact name"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-secondary-700 mb-2">Account Number</label>
+                  <input
+                    type="text"
+                    name="accountNumber"
+                    value={formData.accountNumber}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-2.5 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-secondary-900"
+                    placeholder="e.g., ACC-001"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-secondary-700 mb-2">Email</label>
+                  <input
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-2.5 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-secondary-900"
+                    placeholder="contact@example.com"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-secondary-700 mb-2">Phone</label>
+                  <input
+                    type="tel"
+                    name="phone"
+                    value={formData.phone}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-2.5 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-secondary-900"
+                    placeholder="+1-555-0100"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-secondary-700 mb-2">Website</label>
+                  <input
+                    type="url"
+                    name="website"
+                    value={formData.website}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-2.5 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-secondary-900"
+                    placeholder="https://example.com"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-secondary-700 mb-2">Business Registration Number</label>
+                  <input
+                    type="text"
+                    name="businessRegistrationNumber"
+                    value={formData.businessRegistrationNumber}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-2.5 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-secondary-900"
+                    placeholder="BRN-123456"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Billing Address */}
+            <div>
+              <h3 className="text-lg font-semibold text-secondary-900 mb-4">Billing Address</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-semibold text-secondary-700 mb-2">Street</label>
+                  <input
+                    type="text"
+                    value={formData.billingAddress.street}
+                    onChange={(e) => handleNestedChange('billingAddress', 'street', e.target.value)}
+                    className="w-full px-4 py-2.5 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-secondary-900"
+                    placeholder="123 Main Street"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-secondary-700 mb-2">City</label>
+                  <input
+                    type="text"
+                    value={formData.billingAddress.city}
+                    onChange={(e) => handleNestedChange('billingAddress', 'city', e.target.value)}
+                    className="w-full px-4 py-2.5 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-secondary-900"
+                    placeholder="New York"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-secondary-700 mb-2">State</label>
+                  <input
+                    type="text"
+                    value={formData.billingAddress.state}
+                    onChange={(e) => handleNestedChange('billingAddress', 'state', e.target.value)}
+                    className="w-full px-4 py-2.5 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-secondary-900"
+                    placeholder="NY"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-secondary-700 mb-2">Country</label>
+                  <input
+                    type="text"
+                    value={formData.billingAddress.country}
+                    onChange={(e) => handleNestedChange('billingAddress', 'country', e.target.value)}
+                    className="w-full px-4 py-2.5 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-secondary-900"
+                    placeholder="USA"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-secondary-700 mb-2">Postal Code</label>
+                  <input
+                    type="text"
+                    value={formData.billingAddress.postalCode}
+                    onChange={(e) => handleNestedChange('billingAddress', 'postalCode', e.target.value)}
+                    className="w-full px-4 py-2.5 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-secondary-900"
+                    placeholder="10001"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Delivery Address */}
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-secondary-900">Delivery Address</h3>
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={sameAsBilling}
+                    onChange={(e) => handleSameAsBilling(e.target.checked)}
+                    className="w-4 h-4 text-primary-600 border-secondary-300 rounded focus:ring-2 focus:ring-primary-500"
+                  />
+                  <span className="text-sm font-medium text-secondary-700">Same as billing address</span>
+                </label>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-semibold text-secondary-700 mb-2">Street</label>
+                  <input
+                    type="text"
+                    value={formData.deliveryAddress.street}
+                    onChange={(e) => handleNestedChange('deliveryAddress', 'street', e.target.value)}
+                    disabled={sameAsBilling}
+                    className="w-full px-4 py-2.5 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-secondary-900 disabled:bg-secondary-100 disabled:cursor-not-allowed"
+                    placeholder="123 Main Street"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-secondary-700 mb-2">City</label>
+                  <input
+                    type="text"
+                    value={formData.deliveryAddress.city}
+                    onChange={(e) => handleNestedChange('deliveryAddress', 'city', e.target.value)}
+                    disabled={sameAsBilling}
+                    className="w-full px-4 py-2.5 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-secondary-900 disabled:bg-secondary-100 disabled:cursor-not-allowed"
+                    placeholder="New York"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-secondary-700 mb-2">State</label>
+                  <input
+                    type="text"
+                    value={formData.deliveryAddress.state}
+                    onChange={(e) => handleNestedChange('deliveryAddress', 'state', e.target.value)}
+                    disabled={sameAsBilling}
+                    className="w-full px-4 py-2.5 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-secondary-900 disabled:bg-secondary-100 disabled:cursor-not-allowed"
+                    placeholder="NY"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-secondary-700 mb-2">Country</label>
+                  <input
+                    type="text"
+                    value={formData.deliveryAddress.country}
+                    onChange={(e) => handleNestedChange('deliveryAddress', 'country', e.target.value)}
+                    disabled={sameAsBilling}
+                    className="w-full px-4 py-2.5 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-secondary-900 disabled:bg-secondary-100 disabled:cursor-not-allowed"
+                    placeholder="USA"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-secondary-700 mb-2">Postal Code</label>
+                  <input
+                    type="text"
+                    value={formData.deliveryAddress.postalCode}
+                    onChange={(e) => handleNestedChange('deliveryAddress', 'postalCode', e.target.value)}
+                    disabled={sameAsBilling}
+                    className="w-full px-4 py-2.5 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-secondary-900 disabled:bg-secondary-100 disabled:cursor-not-allowed"
+                    placeholder="10001"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Financial Details */}
+            <div>
+              <h3 className="text-lg font-semibold text-secondary-900 mb-4">Financial Details</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-secondary-700 mb-2">Bank Account Name</label>
+                  <input
+                    type="text"
+                    value={formData.financialDetails.bankAccountName}
+                    onChange={(e) => handleNestedChange('financialDetails', 'bankAccountName', e.target.value)}
+                    className="w-full px-4 py-2.5 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-secondary-900"
+                    placeholder="Business Account"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-secondary-700 mb-2">Bank Account Number</label>
+                  <input
+                    type="text"
+                    value={formData.financialDetails.bankAccountNumber}
+                    onChange={(e) => handleNestedChange('financialDetails', 'bankAccountNumber', e.target.value)}
+                    className="w-full px-4 py-2.5 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-secondary-900"
+                    placeholder="1234567890"
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-semibold text-secondary-700 mb-2">Bank Details</label>
+                  <input
+                    type="text"
+                    value={formData.financialDetails.bankDetails}
+                    onChange={(e) => handleNestedChange('financialDetails', 'bankDetails', e.target.value)}
+                    className="w-full px-4 py-2.5 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-secondary-900"
+                    placeholder="Chase Bank, NY Branch"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-secondary-700 mb-2">Tax ID Number</label>
+                  <input
+                    type="text"
+                    value={formData.financialDetails.taxIdNumber}
+                    onChange={(e) => handleNestedChange('financialDetails', 'taxIdNumber', e.target.value)}
+                    className="w-full px-4 py-2.5 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-secondary-900"
+                    placeholder="TAX-123456"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Notes */}
+            <div>
+              <h3 className="text-lg font-semibold text-secondary-900 mb-4">Notes</h3>
+              <textarea
+                name="notes"
+                value={formData.notes}
+                onChange={handleInputChange}
+                rows="3"
+                className="w-full px-4 py-2.5 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-secondary-900"
+                placeholder="Additional notes about this contact..."
+              />
+            </div>
+          </div>
+
+          <div className="sticky bottom-0 bg-secondary-50 border-t border-secondary-200 px-6 py-4 flex items-center justify-end space-x-3 rounded-b-2xl">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-6 py-2.5 bg-white text-secondary-700 font-semibold rounded-lg border border-secondary-300 hover:bg-secondary-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-6 py-2.5 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all"
+            >
+              {initialData ? 'Update Contact' : 'Create Contact'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+export default ContactFormModal;

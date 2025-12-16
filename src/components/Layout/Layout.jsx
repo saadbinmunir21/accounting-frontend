@@ -1,19 +1,17 @@
 // src/components/Layout/Layout.jsx
 import React from 'react';
-import Sidebar from './Sidebar';
-import Header from './Header';
-import './Layout.css';
+import TopNavbar from '../TopNavbar';
 
 const Layout = ({ children }) => {
   return (
-    <div className="layout">
-      <Sidebar />
-      <div className="main-content">
-        <Header />
-        <div className="content-wrapper">
+    <div className="min-h-screen bg-secondary-50">
+      <TopNavbar />
+
+      <main className="pt-4">
+        <div className="max-w-full px-4 sm:px-6 lg:px-8 py-6">
           {children}
         </div>
-      </div>
+      </main>
     </div>
   );
 };

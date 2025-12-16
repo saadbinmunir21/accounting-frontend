@@ -1,48 +1,39 @@
-// src/pages/Sales/SalesInvoice.jsx
+// Quotation.jsx - Sales Quotations (Not included in stats/analytics)
 import React, { useState, useEffect } from 'react';
 import {
   Plus,
-  Search,
-  Edit2,
   Trash2,
-  ArrowLeft,
+  Edit,
+  Eye,
   Calendar,
-  Filter,
-  X,
-  Building,
-  Package,
-  AlertCircle,
+  FileText,
   CheckCircle,
+  AlertCircle
 } from 'lucide-react';
 import {
-  salesInvoiceAPI,
+  quotationAPI,
   contactAPI,
   itemAPI,
   chartOfAccountsAPI,
-  taxTypeAPI,
-  bankAccountAPI
+  taxTypeAPI
 } from '../../services/api';
 import ContactFormModal from '../../components/Forms/ContactFormModal';
 import ItemFormModal from '../../components/Forms/ItemFormModal';
 import AccountFormModal from '../../components/Forms/AccountFormModal';
 
-const SalesInvoice = () => {
+const Quotation = () => {
   // View state
   const [view, setView] = useState('list'); // 'list' or 'form'
-  const [editingInvoice, setEditingInvoice] = useState(null);
+  const [editingQuotation, setEditingQuotation] = useState(null);
 
   // List view state
-  const [invoices, setInvoices] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('All');
+  const [quotations, setQuotations] = useState([]);
 
   // Form view state
   const [contacts, setContacts] = useState([]);
   const [items, setItems] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [taxTypes, setTaxTypes] = useState([]);
-  const [bankAccounts, setBankAccounts] = useState([]);
   const [message, setMessage] = useState({ type: '', text: '' });
 
   // Modal states
@@ -50,17 +41,13 @@ const SalesInvoice = () => {
   const [showItemModal, setShowItemModal] = useState(false);
   const [showAccountModal, setShowAccountModal] = useState(false);
 
-  // Invoice form data
+  // Quotation form data
   const [formData, setFormData] = useState({
     contact: '',
     issueDate: new Date().toISOString().split('T')[0],
-    dueDate: '',
-    invoiceNumber: '',
+    quotationNumber: '',
     reference: '',
     taxMode: 'Excluding', // Including, Excluding, No Tax
-    onlinePayment: '', // Single bank account (backward compatibility)
-    useSplitPayment: false, // Toggle for split payment
-    paymentAccounts: [{ bankAccount: '', amount: 0 }], // Split payment accounts
     lineItems: [{ item: '', description: '', qty: 1, price: 0, discount: 0, account: '', taxType: '', taxAmount: 0, amount: 0 }],
     subtotal: 0,
     totalTax: 0,
@@ -84,30 +71,26 @@ const SalesInvoice = () => {
 
   // Fetch data on mount
   useEffect(() => {
-    fetchInvoices();
+    fetchQuotations();
     fetchContacts();
     fetchItems();
     fetchAccounts();
     fetchTaxTypes();
-    fetchBankAccounts();
   }, []);
 
-  const fetchInvoices = async () => {
+  const fetchQuotations = async () => {
     try {
-      setLoading(true);
-      const response = await salesInvoiceAPI.getAll();
-      setInvoices(response.data.data || response.data);
+      const response = await quotationAPI.getAll();
+      setQuotations(response.data.data || []);
     } catch (error) {
-      console.error('Error fetching invoices:', error);
-    } finally {
-      setLoading(false);
+      console.error('Error fetching quotations:', error);
     }
   };
 
   const fetchContacts = async () => {
     try {
       const response = await contactAPI.getAll({ type: 'customer' });
-      setContacts(response.data.data || response.data);
+      setContacts(response.data.data || response.data || []);
     } catch (error) {
       console.error('Error fetching contacts:', error);
     }
@@ -116,7 +99,7 @@ const SalesInvoice = () => {
   const fetchItems = async () => {
     try {
       const response = await itemAPI.getAll();
-      setItems(response.data.data || response.data);
+      setItems(response.data.data || []);
     } catch (error) {
       console.error('Error fetching items:', error);
     }
@@ -125,7 +108,7 @@ const SalesInvoice = () => {
   const fetchAccounts = async () => {
     try {
       const response = await chartOfAccountsAPI.getAll();
-      setAccounts(response.data.data || response.data);
+      setAccounts(response.data.data || []);
     } catch (error) {
       console.error('Error fetching accounts:', error);
     }
@@ -134,171 +117,136 @@ const SalesInvoice = () => {
   const fetchTaxTypes = async () => {
     try {
       const response = await taxTypeAPI.getAll();
-      setTaxTypes(response.data.data || response.data);
+      setTaxTypes(response.data.data || []);
     } catch (error) {
       console.error('Error fetching tax types:', error);
     }
   };
 
-  const fetchBankAccounts = async () => {
-    try {
-      const response = await bankAccountAPI.getAll();
-      setBankAccounts(response.data.data || response.data);
-    } catch (error) {
-      console.error('Error fetching bank accounts:', error);
-    }
-  };
 
-  // Filter invoices for list view
-  const filteredInvoices = invoices.filter((invoice) => {
-    const matchesSearch =
-      invoice.invoiceNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      invoice.contact?.contactName?.toLowerCase().includes(searchTerm.toLowerCase());
-
-    const matchesStatus = statusFilter === 'All' || invoice.status === statusFilter;
-
-    return matchesSearch && matchesStatus;
-  });
-
-  // Format currency
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(amount || 0);
-  };
-
-  // Format date
+  // Utility functions
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
-      day: 'numeric',
+      day: 'numeric'
     });
   };
 
-  // Get status badge class
-  const getStatusClass = (status) => {
-    const classes = {
-      Draft: 'bg-gray-100 text-gray-700',
-      Sent: 'bg-blue-100 text-blue-700',
-      Paid: 'bg-green-100 text-green-700',
-      Overdue: 'bg-red-100 text-red-700',
-      Cancelled: 'bg-yellow-100 text-yellow-700',
-    };
-    return classes[status] || 'bg-gray-100 text-gray-700';
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD'
+    }).format(amount || 0);
   };
 
-  // Switch to form view
-  const handleNewInvoice = () => {
-    setEditingInvoice(null);
+  const getStatusClass = (status) => {
+    const statusClasses = {
+      Draft: 'bg-secondary-100 text-secondary-800',
+      Sent: 'bg-blue-100 text-blue-800',
+      Approved: 'bg-green-100 text-green-800',
+    };
+    return statusClasses[status] || 'bg-secondary-100 text-secondary-800';
+  };
+
+  // Navigation functions
+  const handleNewQuotation = () => {
+    setEditingQuotation(null);
     setFormData({
       contact: '',
       issueDate: new Date().toISOString().split('T')[0],
-      dueDate: '',
-      invoiceNumber: '',
+      quotationNumber: '',
       reference: '',
       taxMode: 'Excluding',
-      onlinePayment: '',
-      useSplitPayment: false,
-      paymentAccounts: [{ bankAccount: '', amount: 0 }],
       lineItems: [{ item: '', description: '', qty: 1, price: 0, discount: 0, account: '', taxType: '', taxAmount: 0, amount: 0 }],
       subtotal: 0,
       totalTax: 0,
       grandTotal: 0,
     });
-    setMessage({ type: '', text: '' });
+    setSelectedStatus('Draft');
+    setContactSearchTerm('');
+    setItemSearchTerms({});
+    setAccountSearchTerms({});
     setView('form');
   };
 
-  const handleEditInvoice = (invoice) => {
-    setEditingInvoice(invoice);
-    // Check if split payment is being used
-    const hasSplitPayment = invoice.paymentAccounts && invoice.paymentAccounts.length > 0;
-    setFormData({
-      contact: invoice.contact?._id || '',
-      issueDate: invoice.issueDate?.split('T')[0] || '',
-      dueDate: invoice.dueDate?.split('T')[0] || '',
-      invoiceNumber: invoice.invoiceNumber || '',
-      reference: invoice.reference || '',
-      taxMode: invoice.taxMode || 'Excluding',
-      onlinePayment: invoice.onlinePayment?._id || '',
-      useSplitPayment: hasSplitPayment,
-      paymentAccounts: hasSplitPayment
-        ? invoice.paymentAccounts.map(p => ({
-            bankAccount: p.bankAccount?._id || p.bankAccount || '',
-            amount: p.amount || 0
-          }))
-        : [{ bankAccount: '', amount: 0 }],
-      lineItems: invoice.lineItems || [{ item: '', description: '', qty: 1, price: 0, discount: 0, account: '', taxType: '', taxAmount: 0, amount: 0 }],
-      subtotal: invoice.subtotal || 0,
-      totalTax: invoice.totalTax || 0,
-      grandTotal: invoice.grandTotal || 0,
+  const handleEditQuotation = (quotation) => {
+    setEditingQuotation(quotation);
+
+    const contact = contacts.find(c => c._id === quotation.contact?._id || quotation.contact);
+    setContactSearchTerm(contact?.contactName || '');
+
+    const lineItemsWithSearch = quotation.lineItems.map((lineItem, index) => {
+      const item = items.find(i => i._id === (lineItem.item?._id || lineItem.item));
+      const account = accounts.find(a => a._id === (lineItem.account?._id || lineItem.account));
+
+      if (item) {
+        setItemSearchTerms(prev => ({ ...prev, [index]: item.name }));
+      }
+      if (account) {
+        setAccountSearchTerms(prev => ({ ...prev, [index]: `${account.code} - ${account.name}` }));
+      }
+
+      return {
+        ...lineItem,
+        item: lineItem.item?._id || lineItem.item,
+        account: lineItem.account?._id || lineItem.account,
+        taxType: lineItem.taxRate?._id || lineItem.taxRate,
+      };
     });
-    setMessage({ type: '', text: '' });
+
+    setFormData({
+      contact: quotation.contact?._id || quotation.contact,
+      issueDate: quotation.issueDate?.split('T')[0] || '',
+      quotationNumber: quotation.quotationNumber || '',
+      reference: quotation.reference || '',
+      taxMode: quotation.amountTreatment || 'Excluding',
+      lineItems: lineItemsWithSearch,
+      subtotal: quotation.subtotal || 0,
+      totalTax: quotation.totalTax || 0,
+      grandTotal: quotation.grandTotal || 0,
+    });
+
+    setSelectedStatus(quotation.status || 'Draft');
     setView('form');
   };
 
   const handleBackToList = () => {
     setView('list');
-    setEditingInvoice(null);
+    setEditingQuotation(null);
     setMessage({ type: '', text: '' });
   };
 
-  const handleDeleteInvoice = async (id, invoiceNumber) => {
-    if (window.confirm(`Are you sure you want to delete invoice ${invoiceNumber}?`)) {
+  const handleDeleteQuotation = async (id) => {
+    if (window.confirm('Are you sure you want to delete this quotation?')) {
       try {
-        await salesInvoiceAPI.delete(id);
-        setMessage({ type: 'success', text: 'Invoice deleted successfully!' });
-        fetchInvoices();
+        await quotationAPI.delete(id);
+        setMessage({ type: 'success', text: 'Quotation deleted successfully!' });
+        fetchQuotations();
         setTimeout(() => setMessage({ type: '', text: '' }), 3000);
       } catch (error) {
-        console.error('Error deleting invoice:', error);
-        setMessage({ type: 'error', text: 'Failed to delete invoice' });
+        console.error('Error deleting quotation:', error);
+        setMessage({ type: 'error', text: 'Failed to delete quotation' });
       }
     }
   };
 
   const handleStatusChange = async (id, newStatus) => {
     try {
-      await salesInvoiceAPI.update(id, { status: newStatus });
-      setMessage({ type: 'success', text: 'Status updated successfully!' });
-      fetchInvoices();
+      await quotationAPI.update(id, { status: newStatus });
+
+      if (newStatus === 'Approved') {
+        setMessage({ type: 'success', text: 'Quotation approved and converted to sales invoice!' });
+      } else {
+        setMessage({ type: 'success', text: 'Status updated successfully!' });
+      }
+
+      fetchQuotations();
       setTimeout(() => setMessage({ type: '', text: '' }), 2000);
     } catch (error) {
       console.error('Error updating status:', error);
       setMessage({ type: 'error', text: 'Failed to update status' });
     }
-  };
-
-  // Payment account functions
-  const handleAddPaymentAccount = () => {
-    setFormData({
-      ...formData,
-      paymentAccounts: [...formData.paymentAccounts, { bankAccount: '', amount: 0 }],
-    });
-  };
-
-  const handleRemovePaymentAccount = (index) => {
-    const newPaymentAccounts = formData.paymentAccounts.filter((_, i) => i !== index);
-    setFormData({
-      ...formData,
-      paymentAccounts: newPaymentAccounts.length > 0 ? newPaymentAccounts : [{ bankAccount: '', amount: 0 }],
-    });
-  };
-
-  const handlePaymentAccountChange = (index, field, value) => {
-    const newPaymentAccounts = [...formData.paymentAccounts];
-    newPaymentAccounts[index][field] = value;
-    setFormData({ ...formData, paymentAccounts: newPaymentAccounts });
-  };
-
-  // Calculate remaining amount for split payment
-  const calculateRemainingAmount = () => {
-    const totalAllocated = formData.paymentAccounts.reduce((sum, payment) => {
-      return sum + (parseFloat(payment.amount) || 0);
-    }, 0);
-    return formData.grandTotal - totalAllocated;
   };
 
   // Line item functions
@@ -314,10 +262,7 @@ const SalesInvoice = () => {
 
   const handleRemoveLine = (index) => {
     const newLineItems = formData.lineItems.filter((_, i) => i !== index);
-    setFormData({
-      ...formData,
-      lineItems: newLineItems.length > 0 ? newLineItems : [{ item: '', description: '', qty: 1, price: 0, discount: 0, account: '', taxType: '', taxAmount: 0, amount: 0 }],
-    });
+    setFormData({ ...formData, lineItems: newLineItems });
     calculateTotals(newLineItems);
   };
 
@@ -345,7 +290,6 @@ const SalesInvoice = () => {
     const taxRate = taxType ? parseFloat(taxType.taxPercentage) / 100 : 0;
 
     // Calculate line item amount (qty * price - discount%)
-    // Discount is percentage-based
     const lineSubtotal = qty * price;
     const discountAmount = lineSubtotal * (discountPercent / 100);
     const lineAmount = lineSubtotal - discountAmount; // Amount BEFORE tax
@@ -378,9 +322,8 @@ const SalesInvoice = () => {
       adjustedSubtotal = subtotal;
     } else if (formData.taxMode === 'Including') {
       // Tax is included - re-adjust subtotal
-      // Grand total stays same as subtotal, but we show tax separately
-      grandTotal = subtotal; // Grand total = original subtotal
-      adjustedSubtotal = subtotal - totalTax; // Adjusted subtotal (without tax)
+      grandTotal = subtotal;
+      adjustedSubtotal = subtotal - totalTax;
     } else {
       // No tax
       grandTotal = subtotal;
@@ -397,6 +340,8 @@ const SalesInvoice = () => {
 
   // Contact search functionality
   const handleContactSearch = (searchTerm) => {
+    console.log('🔍 handleContactSearch called with:', searchTerm);
+    console.log('📊 Total contacts available:', contacts.length);
     setContactSearchTerm(searchTerm);
 
     if (searchTerm.trim()) {
@@ -405,11 +350,14 @@ const SalesInvoice = () => {
         contact.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         contact.accountNumber?.toLowerCase().includes(searchTerm.toLowerCase())
       );
+      console.log('✅ Filtered results:', results.length);
       setContactSearchResults(results);
     } else {
       // Show all contacts when search is empty
+      console.log('📋 Showing all contacts:', contacts.length);
       setContactSearchResults(contacts);
     }
+    console.log('👁️ Setting dropdown to visible');
     setShowContactDropdown(true);
   };
 
@@ -474,77 +422,42 @@ const SalesInvoice = () => {
         return;
       }
 
-      // Validate split payment if enabled
-      if (formData.useSplitPayment) {
-        const validPaymentAccounts = formData.paymentAccounts.filter(
-          payment => payment.bankAccount && payment.bankAccount !== '' && payment.amount > 0
-        );
-
-        if (validPaymentAccounts.length === 0) {
-          setMessage({ type: 'error', text: 'Please add at least one bank account with an amount for split payment' });
-          return;
-        }
-
-        const totalAllocated = validPaymentAccounts.reduce((sum, payment) => {
-          return sum + (parseFloat(payment.amount) || 0);
-        }, 0);
-
-        const roundedTotal = Math.round(totalAllocated * 100) / 100;
-        const roundedGrandTotal = Math.round(formData.grandTotal * 100) / 100;
-
-        if (Math.abs(roundedTotal - roundedGrandTotal) > 0.01) {
-          setMessage({
-            type: 'error',
-            text: `Split payment total ($${roundedTotal.toFixed(2)}) must equal grand total ($${roundedGrandTotal.toFixed(2)})`
-          });
-          return;
-        }
-      }
-
-      const invoiceData = {
-        ...formData,
+      const quotationData = {
+        contact: formData.contact,
+        issueDate: formData.issueDate,
+        reference: formData.reference,
         amountTreatment: formData.taxMode, // Backend uses amountTreatment instead of taxMode
         lineItems: validLineItems.map(item => ({
-          ...item,
-          taxRate: item.taxType, // Backend uses taxRate instead of taxType
-          taxType: undefined, // Remove taxType
-          account: item.account || undefined, // Convert empty string to undefined
+          item: item.item,
+          description: item.description,
+          price: item.price,
+          qty: item.qty,
+          discount: item.discount,
+          account: item.account || undefined,
+          taxRate: item.taxType || undefined, // Backend uses taxRate instead of taxType
+          project: item.project || undefined,
         })),
         status,
+        notes: formData.notes || ''
       };
 
-      // Handle payment accounts based on split payment mode
-      if (formData.useSplitPayment) {
-        // Send paymentAccounts array
-        invoiceData.paymentAccounts = formData.paymentAccounts.filter(
-          payment => payment.bankAccount && payment.bankAccount !== '' && payment.amount > 0
-        );
-        delete invoiceData.onlinePayment;
+      if (editingQuotation) {
+        await quotationAPI.update(editingQuotation._id, quotationData);
+        setMessage({ type: 'success', text: 'Quotation updated successfully!' });
       } else {
-        // Send single onlinePayment
-        invoiceData.onlinePayment = formData.onlinePayment || undefined;
-        delete invoiceData.paymentAccounts;
-      }
-
-      // Remove frontend-only fields
-      delete invoiceData.taxMode;
-      delete invoiceData.useSplitPayment;
-
-      if (editingInvoice) {
-        await salesInvoiceAPI.update(editingInvoice._id, invoiceData);
-        setMessage({ type: 'success', text: 'Invoice updated successfully!' });
-      } else {
-        await salesInvoiceAPI.create(invoiceData);
-        setMessage({ type: 'success', text: 'Invoice created successfully!' });
+        await quotationAPI.create(quotationData);
+        setMessage({ type: 'success', text: 'Quotation created successfully!' });
       }
 
       setTimeout(() => {
-        handleBackToList();
-        fetchInvoices();
+        setView('list');
+        setEditingQuotation(null);
+        setMessage({ type: '', text: '' });
+        fetchQuotations();
       }, 1500);
     } catch (error) {
-      console.error('Error saving invoice:', error);
-      setMessage({ type: 'error', text: error.response?.data?.message || 'Failed to save invoice' });
+      console.error('Error saving quotation:', error);
+      setMessage({ type: 'error', text: error.response?.data?.message || 'Failed to save quotation' });
     }
   };
 
@@ -572,164 +485,103 @@ const SalesInvoice = () => {
         {/* Page Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-secondary-900">Sales Invoices</h1>
-            <p className="text-secondary-600 mt-1">Create and manage your sales invoices</p>
+            <h1 className="text-3xl font-bold text-secondary-900">Quotations</h1>
+            <p className="text-secondary-600 mt-1">Manage sales quotations (not included in stats)</p>
           </div>
           <button
-            onClick={handleNewInvoice}
-            className="bg-primary-600 hover:bg-primary-700 text-white rounded-lg px-6 py-3 font-semibold flex items-center space-x-2 shadow-md hover:shadow-lg transition-all"
+            onClick={handleNewQuotation}
+            className="flex items-center space-x-2 px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors shadow-md hover:shadow-lg"
           >
             <Plus className="w-5 h-5" />
-            <span>New Invoice</span>
+            <span className="font-semibold">New Quotation</span>
           </button>
         </div>
 
-        {/* Message Alert */}
+        {/* Message */}
         {message.text && (
-          <div
-            className={`p-4 rounded-lg flex items-start space-x-3 ${
-              message.type === 'success'
-                ? 'bg-green-50 border border-green-200'
-                : 'bg-red-50 border border-red-200'
-            }`}
-          >
-            {message.type === 'success' ? (
-              <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
-            ) : (
-              <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-            )}
-            <p className={`text-sm ${message.type === 'success' ? 'text-green-800' : 'text-red-800'}`}>
-              {message.text}
-            </p>
+          <div className={`p-4 rounded-lg ${message.type === 'success' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
+            {message.text}
           </div>
         )}
 
-        {/* Filters and Search */}
-        <div className="bg-white rounded-xl shadow-soft p-6">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            {/* Search Bar */}
-            <div className="relative flex-1 lg:max-w-md">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-secondary-400" />
-              <input
-                type="text"
-                placeholder="Search by invoice number or customer..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-secondary-900"
-              />
-            </div>
-
-            {/* Status Filter */}
-            <div className="flex items-center space-x-2">
-              <Filter className="w-5 h-5 text-secondary-400" />
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-4 py-2.5 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-secondary-900"
-              >
-                <option value="All">All Status</option>
-                <option value="Draft">Draft</option>
-                <option value="Sent">Sent</option>
-                <option value="Paid">Paid</option>
-                <option value="Overdue">Overdue</option>
-                <option value="Cancelled">Cancelled</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
-        {/* Invoices Table */}
+        {/* Quotations List */}
         <div className="bg-white rounded-xl shadow-soft overflow-hidden">
-          {loading ? (
-            <div className="p-12 text-center">
-              <div className="inline-block w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin"></div>
-              <p className="mt-4 text-secondary-600">Loading invoices...</p>
-            </div>
-          ) : filteredInvoices.length === 0 ? (
-            <div className="p-12 text-center">
-              <p className="text-lg font-semibold text-secondary-900 mb-2">No invoices found</p>
-              <p className="text-secondary-600 mb-6">Get started by creating your first invoice</p>
-              <button
-                onClick={handleNewInvoice}
-                className="bg-primary-600 hover:bg-primary-700 text-white rounded-lg px-6 py-3 font-semibold inline-flex items-center space-x-2 shadow-md hover:shadow-lg transition-all"
-              >
-                <Plus className="w-5 h-5" />
-                <span>New Invoice</span>
-              </button>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-secondary-200 bg-secondary-50">
-                    <th className="text-left py-4 px-6 text-sm font-semibold text-secondary-700">Invoice Number</th>
-                    <th className="text-left py-4 px-6 text-sm font-semibold text-secondary-700">Contact</th>
-                    <th className="text-left py-4 px-6 text-sm font-semibold text-secondary-700">Issue Date</th>
-                    <th className="text-left py-4 px-6 text-sm font-semibold text-secondary-700">Due Date</th>
-                    <th className="text-left py-4 px-6 text-sm font-semibold text-secondary-700">Amount</th>
-                    <th className="text-left py-4 px-6 text-sm font-semibold text-secondary-700">Status</th>
-                    <th className="text-left py-4 px-6 text-sm font-semibold text-secondary-700">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredInvoices.map((invoice) => (
-                    <tr key={invoice._id} className="border-b border-secondary-100 hover:bg-secondary-50 transition-colors">
-                      <td className="py-4 px-6">
-                        <span className="font-semibold text-secondary-900">{invoice.invoiceNumber}</span>
-                      </td>
-                      <td className="py-4 px-6 text-sm text-secondary-700">{invoice.contact?.contactName || 'N/A'}</td>
-                      <td className="py-4 px-6">
-                        <div className="flex items-center space-x-2 text-sm text-secondary-700">
-                          <Calendar className="w-4 h-4 text-secondary-400" />
-                          <span>{formatDate(invoice.issueDate)}</span>
-                        </div>
-                      </td>
-                      <td className="py-4 px-6">
-                        <div className="flex items-center space-x-2 text-sm text-secondary-700">
-                          <Calendar className="w-4 h-4 text-secondary-400" />
-                          <span>{formatDate(invoice.dueDate)}</span>
-                        </div>
-                      </td>
-                      <td className="py-4 px-6">
-                        <span className="font-semibold text-secondary-900">{formatCurrency(invoice.grandTotal)}</span>
-                      </td>
-                      <td className="py-2 px-3">
-                        <select
-                          value={invoice.status}
-                          onChange={(e) => handleStatusChange(invoice._id, e.target.value)}
-                          className={`px-2 py-1 rounded text-xs font-semibold border-0 focus:outline-none focus:ring-1 focus:ring-primary-500 ${getStatusClass(invoice.status)}`}
+          <table className="w-full">
+            <thead className="bg-secondary-50 border-b border-secondary-200">
+              <tr>
+                <th className="text-left py-4 px-6 text-sm font-semibold text-secondary-700">Quotation #</th>
+                <th className="text-left py-4 px-6 text-sm font-semibold text-secondary-700">Contact</th>
+                <th className="text-left py-4 px-6 text-sm font-semibold text-secondary-700">Date</th>
+                <th className="text-left py-4 px-6 text-sm font-semibold text-secondary-700">Amount</th>
+                <th className="text-left py-2 px-3 text-sm font-semibold text-secondary-700">Status</th>
+                <th className="text-left py-4 px-6 text-sm font-semibold text-secondary-700">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-secondary-100">
+              {quotations.length === 0 ? (
+                <tr>
+                  <td colSpan="6" className="py-12 text-center">
+                    <FileText className="w-12 h-12 text-secondary-300 mx-auto mb-3" />
+                    <p className="text-secondary-500">No quotations found</p>
+                  </td>
+                </tr>
+              ) : (
+                quotations.map((quotation) => (
+                  <tr key={quotation._id} className="hover:bg-secondary-50 transition-colors">
+                    <td className="py-4 px-6">
+                      <span className="font-semibold text-secondary-900">{quotation.quotationNumber}</span>
+                    </td>
+                    <td className="py-4 px-6">
+                      <div>
+                        <div className="font-medium text-secondary-900">{quotation.contact?.contactName}</div>
+                        {quotation.contact?.email && (
+                          <div className="text-sm text-secondary-600">{quotation.contact.email}</div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-4 px-6">
+                      <div className="flex items-center space-x-2 text-sm text-secondary-700">
+                        <Calendar className="w-4 h-4 text-secondary-400" />
+                        <span>{formatDate(quotation.issueDate)}</span>
+                      </div>
+                    </td>
+                    <td className="py-4 px-6">
+                      <span className="font-semibold text-secondary-900">{formatCurrency(quotation.grandTotal)}</span>
+                    </td>
+                    <td className="py-2 px-3">
+                      <select
+                        value={quotation.status}
+                        onChange={(e) => handleStatusChange(quotation._id, e.target.value)}
+                        className={`px-2 py-1 rounded text-xs font-semibold border-0 focus:outline-none focus:ring-1 focus:ring-primary-500 ${getStatusClass(quotation.status)}`}
+                      >
+                        <option value="Draft">Draft</option>
+                        <option value="Sent">Sent</option>
+                        <option value="Approved">Approved</option>
+                      </select>
+                    </td>
+                    <td className="py-4 px-6">
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => handleEditQuotation(quotation)}
+                          className="p-2 text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
+                          title="Edit"
                         >
-                          <option value="Draft">Draft</option>
-                          <option value="Sent">Sent</option>
-                          <option value="Paid">Paid</option>
-                          <option value="Overdue">Overdue</option>
-                          <option value="Cancelled">Cancelled</option>
-                        </select>
-                      </td>
-                      <td className="py-4 px-6">
-                        <div className="flex items-center space-x-2">
-                          <button
-                            onClick={() => handleEditInvoice(invoice)}
-                            className="p-2 text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
-                            title="Edit"
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteInvoice(invoice._id, invoice.invoiceNumber)}
-                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                            title="Delete"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+                          <Edit className="w-5 h-5" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteQuotation(quotation._id)}
+                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Delete"
+                        >
+                          <Trash2 className="w-5 h-5" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
     );
@@ -738,51 +590,29 @@ const SalesInvoice = () => {
   // Render form view
   return (
     <div className="space-y-6">
-      {/* Form Header */}
+      {/* Page Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <button
-            onClick={handleBackToList}
-            className="p-2 hover:bg-secondary-100 rounded-lg transition-colors"
-          >
-            <ArrowLeft className="w-6 h-6 text-secondary-600" />
-          </button>
-          <div>
-            <h1 className="text-3xl font-bold text-secondary-900">
-              {editingInvoice ? 'Edit Invoice' : 'Create Invoice'}
-            </h1>
-            <p className="text-secondary-600 mt-1">
-              {editingInvoice ? `Editing ${editingInvoice.invoiceNumber}` : 'Create a new sales invoice'}
-            </p>
-          </div>
+        <div>
+          <h1 className="text-3xl font-bold text-secondary-900">
+            {editingQuotation ? 'Edit Quotation' : 'New Quotation'}
+          </h1>
+          <p className="text-secondary-600 mt-1">
+            {editingQuotation ? 'Update quotation details' : 'Create a new sales quotation'}
+          </p>
         </div>
       </div>
 
-      {/* Message Alert */}
+      {/* Message */}
       {message.text && (
-        <div
-          className={`p-4 rounded-lg flex items-start space-x-3 ${
-            message.type === 'success'
-              ? 'bg-green-50 border border-green-200'
-              : 'bg-red-50 border border-red-200'
-          }`}
-        >
-          {message.type === 'success' ? (
-            <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
-          ) : (
-            <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-          )}
-          <p className={`text-sm ${message.type === 'success' ? 'text-green-800' : 'text-red-800'}`}>
-            {message.text}
-          </p>
+        <div className={`p-4 rounded-lg ${message.type === 'success' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
+          {message.text}
         </div>
       )}
 
-      {/* Invoice Form */}
-      <div className="bg-white rounded-xl shadow-soft p-6">
-        {/* Invoice Details Section */}
+      <div className="bg-white rounded-xl shadow-soft p-8">
+        {/* Quotation Details */}
         <div className="mb-6">
-          <h2 className="text-xl font-bold text-secondary-900 mb-4">Invoice Details</h2>
+          <h2 className="text-xl font-bold text-secondary-900 mb-4">Quotation Details</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {/* Contact */}
             <div>
@@ -841,50 +671,7 @@ const SalesInvoice = () => {
                 value={formData.issueDate}
                 onChange={(e) => setFormData({ ...formData, issueDate: e.target.value })}
                 required
-                className="w-full px-4 py-2.5 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-secondary-900"
-              />
-            </div>
-
-            {/* Due Date */}
-            <div>
-              <label className="block text-sm font-semibold text-secondary-700 mb-2">
-                Due Date <span className="text-red-600">*</span>
-              </label>
-              <input
-                type="date"
-                value={formData.dueDate}
-                onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
-                required
-                className="w-full px-4 py-2.5 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-secondary-900"
-              />
-            </div>
-
-            {/* Invoice Number */}
-            {editingInvoice && (
-              <div>
-                <label className="block text-sm font-semibold text-secondary-700 mb-2">
-                  Invoice Number
-                </label>
-                <input
-                  type="text"
-                  value={formData.invoiceNumber}
-                  readOnly
-                  className="w-full px-4 py-2.5 bg-secondary-100 border border-secondary-200 rounded-lg text-secondary-700 cursor-not-allowed"
-                />
-              </div>
-            )}
-
-            {/* Reference */}
-            <div>
-              <label className="block text-sm font-semibold text-secondary-700 mb-2">
-                Reference
-              </label>
-              <input
-                type="text"
-                value={formData.reference}
-                onChange={(e) => setFormData({ ...formData, reference: e.target.value })}
-                placeholder="Optional reference"
-                className="w-full px-4 py-2.5 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-secondary-900"
+                className="w-full px-4 py-2.5 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-secondary-900"
               />
             </div>
 
@@ -900,149 +687,28 @@ const SalesInvoice = () => {
                   calculateTotals(formData.lineItems);
                 }}
                 required
-                className="w-full px-4 py-2.5 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-secondary-900"
+                className="w-full px-4 py-2.5 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-secondary-900"
               >
-                <option value="Including">Tax Including</option>
                 <option value="Excluding">Tax Excluding</option>
+                <option value="Including">Tax Including</option>
                 <option value="No Tax">No Tax</option>
               </select>
             </div>
-          </div>
-        </div>
 
-        {/* Payment Account Section - Compact */}
-        <div className="mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Payment Mode Selector */}
+            {/* Reference */}
             <div>
               <label className="block text-sm font-semibold text-secondary-700 mb-2">
-                Payment Mode
+                Reference
               </label>
-              <select
-                value={formData.useSplitPayment ? 'split' : 'single'}
-                onChange={(e) => {
-                  const isSplit = e.target.value === 'split';
-                  setFormData({
-                    ...formData,
-                    useSplitPayment: isSplit,
-                    paymentAccounts: isSplit
-                      ? [{ bankAccount: '', amount: formData.grandTotal }]
-                      : [{ bankAccount: '', amount: 0 }],
-                  });
-                }}
-                className="w-full px-4 py-2.5 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-secondary-900"
-              >
-                <option value="single">Single Account</option>
-                <option value="split">Split Payment</option>
-              </select>
+              <input
+                type="text"
+                value={formData.reference}
+                onChange={(e) => setFormData({ ...formData, reference: e.target.value })}
+                placeholder="Optional reference"
+                className="w-full px-4 py-2.5 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-secondary-900"
+              />
             </div>
-
-            {/* Single Bank Account or Split Payment Info */}
-            {!formData.useSplitPayment ? (
-              <div>
-                <label className="block text-sm font-semibold text-secondary-700 mb-2">
-                  Bank Account
-                </label>
-                <select
-                  value={formData.onlinePayment}
-                  onChange={(e) => setFormData({ ...formData, onlinePayment: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-secondary-900"
-                >
-                  <option value="">Select bank account (optional)</option>
-                  {bankAccounts.map((account) => (
-                    <option key={account._id} value={account._id}>
-                      {account.bankName} - {account.accountName}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ) : (
-              <div>
-                <label className="block text-sm font-semibold text-secondary-700 mb-2">
-                  Split Accounts
-                </label>
-                <div className="px-4 py-2.5 bg-blue-50 border border-blue-200 rounded-lg text-sm">
-                  <span className="font-semibold text-blue-900">
-                    {formData.paymentAccounts.filter(p => p.bankAccount).length} account(s) configured
-                  </span>
-                  <span className="text-blue-700 ml-2">
-                    {Math.abs(calculateRemainingAmount()) < 0.01 ? '(Complete)' : '(Incomplete)'}
-                  </span>
-                </div>
-              </div>
-            )}
           </div>
-
-          {/* Split Payment Details - Only shown when split mode is active */}
-          {formData.useSplitPayment && (
-            <div className="mt-4 p-4 bg-secondary-50 rounded-lg border border-secondary-200">
-              <div className="space-y-3">
-                {formData.paymentAccounts.map((payment, index) => (
-                  <div key={index} className="flex items-center space-x-3">
-                    <div className="flex-1">
-                      <select
-                        value={payment.bankAccount}
-                        onChange={(e) => handlePaymentAccountChange(index, 'bankAccount', e.target.value)}
-                        className="w-full px-3 py-2 bg-white border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
-                      >
-                        <option value="">Select bank account...</option>
-                        {bankAccounts.map((account) => (
-                          <option key={account._id} value={account._id}>
-                            {account.bankName} - {account.accountName}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="w-32">
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={payment.amount}
-                        onChange={(e) => handlePaymentAccountChange(index, 'amount', e.target.value)}
-                        placeholder="Amount"
-                        className="w-full px-3 py-2 bg-white border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
-                      />
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => handleRemovePaymentAccount(index)}
-                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                      title="Remove account"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
-
-                <button
-                  type="button"
-                  onClick={handleAddPaymentAccount}
-                  className="px-3 py-1.5 bg-white hover:bg-secondary-100 text-secondary-700 rounded-lg font-medium flex items-center space-x-1 transition-all text-sm border border-secondary-300"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Add Account</span>
-                </button>
-
-                {/* Compact Payment Summary */}
-                <div className="pt-3 border-t border-secondary-300 flex items-center justify-between text-sm">
-                  <div className="flex items-center space-x-4">
-                    <span className="text-secondary-700">
-                      Allocated: <span className="font-semibold text-secondary-900">
-                        {formatCurrency(formData.paymentAccounts.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0))}
-                      </span>
-                    </span>
-                    <span className="text-secondary-700">
-                      Total: <span className="font-semibold text-secondary-900">{formatCurrency(formData.grandTotal)}</span>
-                    </span>
-                  </div>
-                  <span className={`font-semibold ${Math.abs(calculateRemainingAmount()) < 0.01 ? 'text-green-600' : 'text-red-600'}`}>
-                    Remaining: {formatCurrency(calculateRemainingAmount())}
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Line Items Section */}
@@ -1284,14 +950,12 @@ const SalesInvoice = () => {
               <span className="text-lg font-bold text-secondary-900">{formatCurrency(formData.subtotal)}</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-sm font-semibold text-secondary-700">
-                {formData.taxMode === 'Including' ? 'Tax (Included):' : formData.taxMode === 'Excluding' ? 'Tax:' : 'Tax:'}
-              </span>
+              <span className="text-sm font-semibold text-secondary-700">Tax:</span>
               <span className="text-lg font-bold text-secondary-900">{formatCurrency(formData.totalTax)}</span>
             </div>
-            <div className="border-t border-secondary-300 pt-3">
+            <div className="border-t border-secondary-200 pt-3">
               <div className="flex justify-between items-center">
-                <span className="text-base font-bold text-secondary-900">Total:</span>
+                <span className="text-base font-bold text-secondary-900">Grand Total:</span>
                 <span className="text-2xl font-bold text-primary-600">{formatCurrency(formData.grandTotal)}</span>
               </div>
             </div>
@@ -1314,16 +978,14 @@ const SalesInvoice = () => {
           >
             <option value="Draft">Draft</option>
             <option value="Sent">Sent</option>
-            <option value="Paid">Paid</option>
-            <option value="Overdue">Overdue</option>
-            <option value="Cancelled">Cancelled</option>
+            <option value="Approved">Approved</option>
           </select>
           <button
             type="button"
             onClick={() => handleSubmit(selectedStatus)}
             className="px-6 py-2 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all text-sm"
           >
-            Save Invoice
+            Save Quotation
           </button>
         </div>
       </div>
@@ -1353,4 +1015,4 @@ const SalesInvoice = () => {
   );
 };
 
-export default SalesInvoice;
+export default Quotation;

@@ -1,11 +1,336 @@
 // src/pages/Accounts/TaxTypes.jsx
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { Plus, Search, Edit2, Trash2, X, AlertCircle, CheckCircle, Receipt } from 'lucide-react';
+import { taxTypeAPI } from '../../services/api';
 
 const TaxTypes = () => {
+  const [taxTypes, setTaxTypes] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showModal, setShowModal] = useState(false);
+  const [editingType, setEditingType] = useState(null);
+  const [message, setMessage] = useState({ type: '', text: '' });
+  const [formData, setFormData] = useState({
+    name: '',
+    taxPercentage: '',
+  });
+
+  // Fetch data on mount
+  useEffect(() => {
+    fetchTaxTypes();
+  }, []);
+
+  const fetchTaxTypes = async () => {
+    try {
+      setLoading(true);
+      const response = await taxTypeAPI.getAll();
+      setTaxTypes(response.data.data || response.data);
+    } catch (error) {
+      console.error('Error fetching tax types:', error);
+      setMessage({ type: 'error', text: 'Failed to fetch tax types' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Filter tax types based on search
+  const filteredTaxTypes = taxTypes.filter((type) =>
+    type.name?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // Open modal for adding new tax type
+  const handleAddNew = () => {
+    setEditingType(null);
+    setFormData({
+      name: '',
+      taxPercentage: '',
+    });
+    setMessage({ type: '', text: '' });
+    setShowModal(true);
+  };
+
+  // Open modal for editing tax type
+  const handleEdit = (type) => {
+    setEditingType(type);
+    setFormData({
+      name: type.name || '',
+      taxPercentage: type.taxPercentage || '',
+    });
+    setMessage({ type: '', text: '' });
+    setShowModal(true);
+  };
+
+  // Close modal
+  const handleCloseModal = () => {
+    setShowModal(false);
+    setEditingType(null);
+    setMessage({ type: '', text: '' });
+  };
+
+  // Handle form input changes
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  // Submit form (create or update)
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    // Validate tax percentage is between 0 and 100
+    const percentage = parseFloat(formData.taxPercentage);
+    if (isNaN(percentage) || percentage < 0 || percentage > 100) {
+      setMessage({ type: 'error', text: 'Tax percentage must be between 0 and 100' });
+      return;
+    }
+
+    try {
+      if (editingType) {
+        await taxTypeAPI.update(editingType._id, formData);
+        setMessage({ type: 'success', text: 'Tax type updated successfully!' });
+      } else {
+        await taxTypeAPI.create(formData);
+        setMessage({ type: 'success', text: 'Tax type created successfully!' });
+      }
+      setTimeout(() => {
+        handleCloseModal();
+        fetchTaxTypes();
+      }, 1500);
+    } catch (error) {
+      console.error('Error saving tax type:', error);
+      setMessage({ type: 'error', text: error.response?.data?.message || 'Failed to save tax type' });
+    }
+  };
+
+  // Delete tax type
+  const handleDelete = async (id, name) => {
+    if (window.confirm(`Are you sure you want to delete "${name}"?`)) {
+      try {
+        await taxTypeAPI.delete(id);
+        setMessage({ type: 'success', text: 'Tax type deleted successfully!' });
+        fetchTaxTypes();
+        setTimeout(() => setMessage({ type: '', text: '' }), 3000);
+      } catch (error) {
+        console.error('Error deleting tax type:', error);
+        setMessage({ type: 'error', text: 'Failed to delete tax type' });
+      }
+    }
+  };
+
   return (
-    <div className="page">
-      <h1>Tax Types</h1>
-      <p>Tax Types content will go here...</p>
+    <div className="space-y-6">
+      {/* Page Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-secondary-900">Tax Types</h1>
+          <p className="text-secondary-600 mt-1">Manage your tax type categories</p>
+        </div>
+        <button
+          onClick={handleAddNew}
+          className="bg-primary-600 hover:bg-primary-700 text-white rounded-lg px-5 py-2.5 font-semibold flex items-center space-x-2 shadow-md hover:shadow-lg transition-all"
+        >
+          <Plus className="w-5 h-5" />
+          <span>Add Tax Type</span>
+        </button>
+      </div>
+
+      {/* Message Alert */}
+      {message.text && !showModal && (
+        <div
+          className={`p-4 rounded-lg flex items-start space-x-3 animate-slideDown ${
+            message.type === 'success'
+              ? 'bg-green-50 border border-green-200'
+              : 'bg-red-50 border border-red-200'
+          }`}
+        >
+          {message.type === 'success' ? (
+            <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+          ) : (
+            <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+          )}
+          <p className={`text-sm ${message.type === 'success' ? 'text-green-800' : 'text-red-800'}`}>
+            {message.text}
+          </p>
+        </div>
+      )}
+
+      {/* Search Bar */}
+      <div className="bg-white rounded-xl shadow-soft p-6">
+        <div className="relative max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-secondary-400" />
+          <input
+            type="text"
+            placeholder="Search tax types..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-4 py-2.5 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-secondary-900"
+          />
+        </div>
+      </div>
+
+      {/* Tax Types Table */}
+      <div className="bg-white rounded-xl shadow-soft overflow-hidden">
+        {loading ? (
+          <div className="p-12 text-center">
+            <div className="inline-block w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin"></div>
+            <p className="mt-4 text-secondary-600">Loading tax types...</p>
+          </div>
+        ) : filteredTaxTypes.length === 0 ? (
+          <div className="p-12 text-center">
+            <Receipt className="w-16 h-16 mx-auto text-secondary-300 mb-4" />
+            <p className="text-lg font-semibold text-secondary-900 mb-2">No tax types found</p>
+            <p className="text-secondary-600 mb-6">Get started by creating your first tax type</p>
+            <button
+              onClick={handleAddNew}
+              className="bg-primary-600 hover:bg-primary-700 text-white rounded-lg px-5 py-2.5 font-semibold inline-flex items-center space-x-2 shadow-md hover:shadow-lg transition-all"
+            >
+              <Plus className="w-5 h-5" />
+              <span>Add Tax Type</span>
+            </button>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-secondary-200 bg-secondary-50">
+                  <th className="text-left py-2 px-3 text-sm font-semibold text-secondary-700">Name</th>
+                  <th className="text-left py-2 px-3 text-sm font-semibold text-secondary-700">Tax Percentage</th>
+                  <th className="text-left py-2 px-3 text-sm font-semibold text-secondary-700">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredTaxTypes.map((type) => (
+                  <tr key={type._id} className="border-b border-secondary-100 hover:bg-secondary-50 transition-colors">
+                    <td className="py-2 px-3">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center">
+                          <Receipt className="w-5 h-5 text-primary-600" />
+                        </div>
+                        <span className="font-semibold text-secondary-900">{type.name}</span>
+                      </div>
+                    </td>
+                    <td className="py-2 px-3">
+                      <span className="text-secondary-900">{type.taxPercentage}%</span>
+                    </td>
+                    <td className="py-2 px-3">
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => handleEdit(type)}
+                          className="p-2 text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
+                          title="Edit"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(type._id, type.name)}
+                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Delete"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Modal for Add/Edit Tax Type */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" onClick={handleCloseModal}>
+          <div className="bg-white rounded-2xl shadow-large w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-white border-b border-secondary-200 px-6 py-4 flex items-center justify-between rounded-t-2xl">
+              <h2 className="text-2xl font-bold text-secondary-900">
+                {editingType ? 'Edit Tax Type' : 'Add New Tax Type'}
+              </h2>
+              <button onClick={handleCloseModal} className="p-2 hover:bg-secondary-100 rounded-lg transition-colors">
+                <X className="w-6 h-6 text-secondary-600" />
+              </button>
+            </div>
+
+            {/* Message Alert in Modal */}
+            {message.text && (
+              <div className="px-6 pt-4">
+                <div
+                  className={`p-4 rounded-lg flex items-start space-x-3 ${
+                    message.type === 'success'
+                      ? 'bg-green-50 border border-green-200'
+                      : 'bg-red-50 border border-red-200'
+                  }`}
+                >
+                  {message.type === 'success' ? (
+                    <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+                  ) : (
+                    <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                  )}
+                  <p className={`text-sm ${message.type === 'success' ? 'text-green-800' : 'text-red-800'}`}>
+                    {message.text}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit}>
+              <div className="px-6 py-6 space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold text-secondary-700 mb-2">
+                    Name <span className="text-red-600">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleInputChange}
+                    required
+                    className="w-full px-4 py-2.5 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-secondary-900"
+                    placeholder="e.g., VAT, GST, Sales Tax"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-secondary-700 mb-2">
+                    Tax Percentage (0-100) <span className="text-red-600">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    name="taxPercentage"
+                    value={formData.taxPercentage}
+                    onChange={handleInputChange}
+                    required
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    className="w-full px-4 py-2.5 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-secondary-900"
+                    placeholder="e.g., 15"
+                  />
+                </div>
+              </div>
+
+              <div className="bg-secondary-50 border-t border-secondary-200 px-6 py-4 flex items-center justify-end space-x-3 rounded-b-2xl">
+                <button
+                  type="button"
+                  onClick={handleCloseModal}
+                  className="px-6 py-2.5 bg-white text-secondary-700 font-semibold rounded-lg border border-secondary-300 hover:bg-secondary-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-2.5 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all"
+                >
+                  {editingType ? 'Update Tax Type' : 'Create Tax Type'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

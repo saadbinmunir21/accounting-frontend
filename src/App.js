@@ -1,40 +1,114 @@
 // src/App.js
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider } from './context/AuthContext';
 import Layout from './components/Layout/Layout';
+import ProtectedRoute from './components/ProtectedRoute';
 
-// Import pages
+// Auth Pages
+import Login from './pages/Auth/Login';
+
+// Main Pages
 import Dashboard from './pages/Dashboard/Dashboard';
+
+// Sales Pages
 import SalesInvoice from './pages/Sales/SalesInvoice';
+import Quotation from './pages/Sales/Quotation';
+
+// Purchase Pages
 import Bills from './pages/Purchase/Bills';
+import PurchaseOrder from './pages/Purchase/PurchaseOrder';
+
+// Contacts
 import Contacts from './pages/Contacts/Contacts';
+
+// Accounts Pages
 import ChartOfAccounts from './pages/Accounts/ChartOfAccounts';
 import BankAccount from './pages/Accounts/BankAccount';
-import BankAccountTypes from './pages/Accounts/BankAccountTypes';
+
+// Manage Pages
 import AccountType from './pages/Accounts/AccountType';
+import BankAccountTypes from './pages/Accounts/BankAccountTypes';
 import TaxTypes from './pages/Accounts/TaxTypes';
-import Projects from './pages/Projects/Projects';
+import Items from './pages/Manage/Items';
+import Users from './pages/Manage/Users';
+
+// Profile
+import Profile from './pages/Profile/Profile';
+
+// Reports
+import Reports from './pages/Reports/Reports';
 
 import './App.css';
 
 function App() {
   return (
-    <Router>
-      <Layout>
+    <AuthProvider>
+      <Router>
         <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/sales/invoices" element={<SalesInvoice />} />
-          <Route path="/purchase/bills" element={<Bills />} />
-          <Route path="/contacts" element={<Contacts />} />
-          <Route path="/accounts/chart-of-accounts" element={<ChartOfAccounts />} />
-          <Route path="/accounts/bank-accounts" element={<BankAccount />} />
-          <Route path="/accounts/bank-account-types" element={<BankAccountTypes />} />
-          <Route path="/accounts/account-types" element={<AccountType />} />
-          <Route path="/accounts/tax-types" element={<TaxTypes />} />
-          <Route path="/projects" element={<Projects />} />
+          {/* Public Route */}
+          <Route path="/login" element={<Login />} />
+
+          {/* Protected Routes */}
+          <Route
+            path="/*"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <Routes>
+                    {/* Dashboard */}
+                    <Route path="/" element={<Dashboard />} />
+
+                    {/* Sales */}
+                    <Route path="/sales/invoices" element={<SalesInvoice />} />
+                    <Route path="/sales/quotations" element={<Quotation />} />
+
+                    {/* Purchases */}
+                    <Route path="/purchase/bills" element={<Bills />} />
+                    <Route path="/purchase/orders" element={<PurchaseOrder />} />
+
+                    {/* Contacts */}
+                    <Route path="/contacts" element={<Contacts />} />
+
+                    {/* Accounts */}
+                    <Route path="/accounts/chart-of-accounts" element={<ChartOfAccounts />} />
+                    <Route path="/accounts/bank-accounts" element={<BankAccount />} />
+
+                    {/* Reports */}
+                    <Route path="/reports" element={<Reports />} />
+
+                    {/* Accounts - Account Types, Bank Account Types, Tax Types */}
+                    <Route path="/accounts/account-types" element={<AccountType />} />
+                    <Route path="/accounts/bank-account-types" element={<BankAccountTypes />} />
+                    <Route path="/accounts/tax-types" element={<TaxTypes />} />
+
+                    {/* Manage */}
+                    <Route path="/manage/account-types" element={<AccountType />} />
+                    <Route path="/manage/bank-account-types" element={<BankAccountTypes />} />
+                    <Route path="/manage/tax-types" element={<TaxTypes />} />
+                    <Route path="/manage/items" element={<Items />} />
+                    <Route
+                      path="/manage/users"
+                      element={
+                        <ProtectedRoute requireAdmin>
+                          <Users />
+                        </ProtectedRoute>
+                      }
+                    />
+
+                    {/* Profile */}
+                    <Route path="/profile" element={<Profile />} />
+
+                    {/* 404 */}
+                    <Route path="*" element={<Navigate to="/" replace />} />
+                  </Routes>
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
         </Routes>
-      </Layout>
-    </Router>
+      </Router>
+    </AuthProvider>
   );
 }
 

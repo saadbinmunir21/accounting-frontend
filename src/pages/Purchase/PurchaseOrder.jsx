@@ -1,4 +1,4 @@
-// Bills.jsx - Purchase Bills/Expenses (Vendor bills)
+// PurchaseOrder.jsx - Purchase Orders to Vendors
 import React, { useState, useEffect } from 'react';
 import {
   Plus,
@@ -11,31 +11,29 @@ import {
   AlertCircle
 } from 'lucide-react';
 import {
-  billAPI,
+  purchaseOrderAPI,
   contactAPI,
   itemAPI,
   chartOfAccountsAPI,
-  taxTypeAPI,
-  bankAccountAPI
+  taxTypeAPI
 } from '../../services/api';
 import ContactFormModal from '../../components/Forms/ContactFormModal';
 import ItemFormModal from '../../components/Forms/ItemFormModal';
 import AccountFormModal from '../../components/Forms/AccountFormModal';
 
-const Bills = () => {
+const PurchaseOrder = () => {
   // View state
   const [view, setView] = useState('list'); // 'list' or 'form'
-  const [editingBill, setEditingBill] = useState(null);
+  const [editingPO, setEditingPO] = useState(null);
 
   // List view state
-  const [bills, setBills] = useState([]);
+  const [purchaseOrders, setPurchaseOrders] = useState([]);
 
   // Form view state
   const [contacts, setContacts] = useState([]);
   const [items, setItems] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [taxTypes, setTaxTypes] = useState([]);
-  const [bankAccounts, setBankAccounts] = useState([]);
   const [message, setMessage] = useState({ type: '', text: '' });
 
   // Modal states
@@ -43,17 +41,13 @@ const Bills = () => {
   const [showItemModal, setShowItemModal] = useState(false);
   const [showAccountModal, setShowAccountModal] = useState(false);
 
-  // Bill form data
+  // PO form data
   const [formData, setFormData] = useState({
     contact: '',
     issueDate: new Date().toISOString().split('T')[0],
-    dueDate: '',
-    billNumber: '',
+    purchaseOrderNumber: '',
     reference: '',
     taxMode: 'Excluding', // Including, Excluding, No Tax
-    onlinePayment: '', // Single bank account (backward compatibility)
-    useSplitPayment: false, // Toggle for split payment
-    paymentAccounts: [{ bankAccount: '', amount: 0 }], // Split payment accounts
     lineItems: [{ item: '', description: '', qty: 1, price: 0, discount: 0, account: '', taxType: '', taxAmount: 0, amount: 0 }],
     subtotal: 0,
     totalTax: 0,
@@ -77,20 +71,19 @@ const Bills = () => {
 
   // Fetch data on mount
   useEffect(() => {
-    fetchBills();
+    fetchPurchaseOrders();
     fetchContacts();
     fetchItems();
     fetchAccounts();
     fetchTaxTypes();
-    fetchBankAccounts();
   }, []);
 
-  const fetchBills = async () => {
+  const fetchPurchaseOrders = async () => {
     try {
-      const response = await billAPI.getAll();
-      setBills(response.data.data || []);
+      const response = await purchaseOrderAPI.getAll();
+      setPurchaseOrders(response.data.data || []);
     } catch (error) {
-      console.error('Error fetching bills:', error);
+      console.error('Error fetching purchase orders:', error);
     }
   };
 
@@ -130,14 +123,6 @@ const Bills = () => {
     }
   };
 
-  const fetchBankAccounts = async () => {
-    try {
-      const response = await bankAccountAPI.getAll();
-      setBankAccounts(response.data.data || response.data);
-    } catch (error) {
-      console.error('Error fetching bank accounts:', error);
-    }
-  };
 
   // Utility functions
   const formatDate = (dateString) => {
@@ -159,26 +144,20 @@ const Bills = () => {
     const statusClasses = {
       Draft: 'bg-secondary-100 text-secondary-800',
       Sent: 'bg-blue-100 text-blue-800',
-      Paid: 'bg-green-100 text-green-800',
-      Overdue: 'bg-red-100 text-red-800',
-      Cancelled: 'bg-gray-100 text-gray-800',
+      Approved: 'bg-green-100 text-green-800',
     };
     return statusClasses[status] || 'bg-secondary-100 text-secondary-800';
   };
 
   // Navigation functions
-  const handleNewBill = () => {
-    setEditingBill(null);
+  const handleNewPO = () => {
+    setEditingPO(null);
     setFormData({
       contact: '',
       issueDate: new Date().toISOString().split('T')[0],
-      dueDate: '',
-      billNumber: '',
+      purchaseOrderNumber: '',
       reference: '',
       taxMode: 'Excluding',
-      onlinePayment: '',
-      useSplitPayment: false,
-      paymentAccounts: [{ bankAccount: '', amount: 0 }],
       lineItems: [{ item: '', description: '', qty: 1, price: 0, discount: 0, account: '', taxType: '', taxAmount: 0, amount: 0 }],
       subtotal: 0,
       totalTax: 0,
@@ -191,13 +170,13 @@ const Bills = () => {
     setView('form');
   };
 
-  const handleEditBill = (bill) => {
-    setEditingBill(bill);
+  const handleEditPO = (po) => {
+    setEditingPO(po);
 
-    const contact = contacts.find(c => c._id === bill.contact?._id || bill.contact);
+    const contact = contacts.find(c => c._id === po.contact?._id || po.contact);
     setContactSearchTerm(contact?.contactName || '');
 
-    const lineItemsWithSearch = bill.lineItems.map((lineItem, index) => {
+    const lineItemsWithSearch = po.lineItems.map((lineItem, index) => {
       const item = items.find(i => i._id === (lineItem.item?._id || lineItem.item));
       const account = accounts.find(a => a._id === (lineItem.account?._id || lineItem.account));
 
@@ -216,93 +195,58 @@ const Bills = () => {
       };
     });
 
-    // Check if split payment is being used
-    const hasSplitPayment = bill.paymentAccounts && bill.paymentAccounts.length > 0;
     setFormData({
-      contact: bill.contact?._id || bill.contact,
-      issueDate: bill.issueDate?.split('T')[0] || '',
-      dueDate: bill.dueDate?.split('T')[0] || '',
-      billNumber: bill.billNumber || '',
-      reference: bill.reference || '',
-      taxMode: bill.amountTreatment || 'Excluding',
-      onlinePayment: bill.onlinePayment?._id || '',
-      useSplitPayment: hasSplitPayment,
-      paymentAccounts: hasSplitPayment
-        ? bill.paymentAccounts.map(p => ({
-            bankAccount: p.bankAccount?._id || p.bankAccount || '',
-            amount: p.amount || 0
-          }))
-        : [{ bankAccount: '', amount: 0 }],
+      contact: po.contact?._id || po.contact,
+      issueDate: po.issueDate?.split('T')[0] || '',
+      purchaseOrderNumber: po.purchaseOrderNumber || '',
+      reference: po.reference || '',
+      taxMode: po.amountTreatment || 'Excluding',
       lineItems: lineItemsWithSearch,
-      subtotal: bill.subtotal || 0,
-      totalTax: bill.totalTax || 0,
-      grandTotal: bill.grandTotal || 0,
+      subtotal: po.subtotal || 0,
+      totalTax: po.totalTax || 0,
+      grandTotal: po.grandTotal || 0,
     });
 
-    setSelectedStatus(bill.status || 'Draft');
+    setSelectedStatus(po.status || 'Draft');
     setView('form');
   };
 
   const handleBackToList = () => {
     setView('list');
-    setEditingBill(null);
+    setEditingPO(null);
     setMessage({ type: '', text: '' });
   };
 
-  const handleDeleteBill = async (id) => {
-    if (window.confirm('Are you sure you want to delete this bill?')) {
+  const handleDeletePO = async (id) => {
+    if (window.confirm('Are you sure you want to delete this purchase order?')) {
       try {
-        await billAPI.delete(id);
-        setMessage({ type: 'success', text: 'Bill deleted successfully!' });
-        fetchBills();
+        await purchaseOrderAPI.delete(id);
+        setMessage({ type: 'success', text: 'Purchase order deleted successfully!' });
+        fetchPurchaseOrders();
         setTimeout(() => setMessage({ type: '', text: '' }), 3000);
       } catch (error) {
-        console.error('Error deleting bill:', error);
-        setMessage({ type: 'error', text: 'Failed to delete bill' });
+        console.error('Error deleting purchase order:', error);
+        setMessage({ type: 'error', text: 'Failed to delete purchase order' });
       }
     }
   };
 
   const handleStatusChange = async (id, newStatus) => {
     try {
-      await billAPI.update(id, { status: newStatus });
-      setMessage({ type: 'success', text: 'Status updated successfully!' });
-      fetchBills();
+      await purchaseOrderAPI.update(id, { status: newStatus });
+
+      if (newStatus === 'Approved') {
+        setMessage({ type: 'success', text: 'Purchase order approved and converted to bill!' });
+      } else {
+        setMessage({ type: 'success', text: 'Status updated successfully!' });
+      }
+
+      fetchPurchaseOrders();
       setTimeout(() => setMessage({ type: '', text: '' }), 2000);
     } catch (error) {
       console.error('Error updating status:', error);
       setMessage({ type: 'error', text: 'Failed to update status' });
     }
-  };
-
-  // Payment account functions
-  const handleAddPaymentAccount = () => {
-    setFormData({
-      ...formData,
-      paymentAccounts: [...formData.paymentAccounts, { bankAccount: '', amount: 0 }],
-    });
-  };
-
-  const handleRemovePaymentAccount = (index) => {
-    const newPaymentAccounts = formData.paymentAccounts.filter((_, i) => i !== index);
-    setFormData({
-      ...formData,
-      paymentAccounts: newPaymentAccounts.length > 0 ? newPaymentAccounts : [{ bankAccount: '', amount: 0 }],
-    });
-  };
-
-  const handlePaymentAccountChange = (index, field, value) => {
-    const newPaymentAccounts = [...formData.paymentAccounts];
-    newPaymentAccounts[index][field] = value;
-    setFormData({ ...formData, paymentAccounts: newPaymentAccounts });
-  };
-
-  // Calculate remaining amount for split payment
-  const calculateRemainingAmount = () => {
-    const totalAllocated = formData.paymentAccounts.reduce((sum, payment) => {
-      return sum + (parseFloat(payment.amount) || 0);
-    }, 0);
-    return formData.grandTotal - totalAllocated;
   };
 
   // Line item functions
@@ -396,8 +340,8 @@ const Bills = () => {
 
   // Contact search functionality
   const handleContactSearch = (searchTerm) => {
-    console.log('🔍 [BILLS] handleContactSearch called with:', searchTerm);
-    console.log('📊 [BILLS] Total contacts available:', contacts.length);
+    console.log('🔍 [PO] handleContactSearch called with:', searchTerm);
+    console.log('📊 [PO] Total contacts available:', contacts.length);
     setContactSearchTerm(searchTerm);
 
     if (searchTerm.trim()) {
@@ -406,14 +350,14 @@ const Bills = () => {
         contact.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         contact.accountNumber?.toLowerCase().includes(searchTerm.toLowerCase())
       );
-      console.log('✅ [BILLS] Filtered results:', results.length);
+      console.log('✅ [PO] Filtered results:', results.length);
       setContactSearchResults(results);
     } else {
       // Show all contacts when search is empty
-      console.log('📋 [BILLS] Showing all contacts:', contacts.length);
+      console.log('📋 [PO] Showing all contacts:', contacts.length);
       setContactSearchResults(contacts);
     }
-    console.log('👁️ [BILLS] Setting dropdown to visible');
+    console.log('👁️ [PO] Setting dropdown to visible');
     setShowContactDropdown(true);
   };
 
@@ -478,34 +422,7 @@ const Bills = () => {
         return;
       }
 
-      // Validate split payment if enabled
-      if (formData.useSplitPayment) {
-        const validPaymentAccounts = formData.paymentAccounts.filter(
-          payment => payment.bankAccount && payment.bankAccount !== '' && payment.amount > 0
-        );
-
-        if (validPaymentAccounts.length === 0) {
-          setMessage({ type: 'error', text: 'Please add at least one bank account with an amount for split payment' });
-          return;
-        }
-
-        const totalAllocated = validPaymentAccounts.reduce((sum, payment) => {
-          return sum + (parseFloat(payment.amount) || 0);
-        }, 0);
-
-        const roundedTotal = Math.round(totalAllocated * 100) / 100;
-        const roundedGrandTotal = Math.round(formData.grandTotal * 100) / 100;
-
-        if (Math.abs(roundedTotal - roundedGrandTotal) > 0.01) {
-          setMessage({
-            type: 'error',
-            text: `Split payment total ($${roundedTotal.toFixed(2)}) must equal grand total ($${roundedGrandTotal.toFixed(2)})`
-          });
-          return;
-        }
-      }
-
-      const billData = {
+      const poData = {
         ...formData,
         amountTreatment: formData.taxMode, // Backend uses amountTreatment instead of taxMode
         lineItems: validLineItems.map(item => ({
@@ -517,40 +434,26 @@ const Bills = () => {
         status,
       };
 
-      // Handle payment accounts based on split payment mode
-      if (formData.useSplitPayment) {
-        // Send paymentAccounts array
-        billData.paymentAccounts = formData.paymentAccounts.filter(
-          payment => payment.bankAccount && payment.bankAccount !== '' && payment.amount > 0
-        );
-        delete billData.onlinePayment;
-      } else {
-        // Send single onlinePayment
-        billData.onlinePayment = formData.onlinePayment || undefined;
-        delete billData.paymentAccounts;
-      }
-
       // Remove frontend-only fields
-      delete billData.taxMode;
-      delete billData.useSplitPayment;
+      delete poData.taxMode;
 
-      if (editingBill) {
-        await billAPI.update(editingBill._id, billData);
-        setMessage({ type: 'success', text: 'Bill updated successfully!' });
+      if (editingPO) {
+        await purchaseOrderAPI.update(editingPO._id, poData);
+        setMessage({ type: 'success', text: 'Purchase order updated successfully!' });
       } else {
-        await billAPI.create(billData);
-        setMessage({ type: 'success', text: 'Bill created successfully!' });
+        await purchaseOrderAPI.create(poData);
+        setMessage({ type: 'success', text: 'Purchase order created successfully!' });
       }
 
       setTimeout(() => {
         setView('list');
-        setEditingBill(null);
+        setEditingPO(null);
         setMessage({ type: '', text: '' });
-        fetchBills();
+        fetchPurchaseOrders();
       }, 1500);
     } catch (error) {
-      console.error('Error saving bill:', error);
-      setMessage({ type: 'error', text: error.response?.data?.message || 'Failed to save bill' });
+      console.error('Error saving purchase order:', error);
+      setMessage({ type: 'error', text: error.response?.data?.message || 'Failed to save purchase order' });
     }
   };
 
@@ -578,15 +481,15 @@ const Bills = () => {
         {/* Page Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-secondary-900">Bills</h1>
-            <p className="text-secondary-600 mt-1">Manage vendor bills and expenses</p>
+            <h1 className="text-3xl font-bold text-secondary-900">Purchase Orders</h1>
+            <p className="text-secondary-600 mt-1">Manage purchase orders to vendors</p>
           </div>
           <button
-            onClick={handleNewBill}
-            className="flex items-center space-x-2 px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors shadow-md hover:shadow-lg"
+            onClick={handleNewPO}
+            className="flex items-center space-x-2 px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-md hover:shadow-lg"
           >
             <Plus className="w-5 h-5" />
-            <span className="font-semibold">New Bill</span>
+            <span className="font-semibold">New Purchase Order</span>
           </button>
         </div>
 
@@ -597,12 +500,12 @@ const Bills = () => {
           </div>
         )}
 
-        {/* Bills List */}
+        {/* Purchase Orders List */}
         <div className="bg-white rounded-xl shadow-soft overflow-hidden">
           <table className="w-full">
             <thead className="bg-secondary-50 border-b border-secondary-200">
               <tr>
-                <th className="text-left py-4 px-6 text-sm font-semibold text-secondary-700">Bill #</th>
+                <th className="text-left py-4 px-6 text-sm font-semibold text-secondary-700">PO #</th>
                 <th className="text-left py-4 px-6 text-sm font-semibold text-secondary-700">Vendor</th>
                 <th className="text-left py-4 px-6 text-sm font-semibold text-secondary-700">Date</th>
                 <th className="text-left py-4 px-6 text-sm font-semibold text-secondary-700">Amount</th>
@@ -611,60 +514,61 @@ const Bills = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-secondary-100">
-              {bills.length === 0 ? (
+              {purchaseOrders.length === 0 ? (
                 <tr>
                   <td colSpan="6" className="py-12 text-center">
                     <FileText className="w-12 h-12 text-secondary-300 mx-auto mb-3" />
-                    <p className="text-secondary-500">No bills found</p>
+                    <p className="text-secondary-500">No purchase orders found</p>
                   </td>
                 </tr>
               ) : (
-                bills.map((bill) => (
-                  <tr key={bill._id} className="hover:bg-secondary-50 transition-colors">
+                purchaseOrders.map((po) => (
+                  <tr key={po._id} className="hover:bg-secondary-50 transition-colors">
                     <td className="py-4 px-6">
-                      <span className="font-semibold text-secondary-900">{bill.billNumber}</span>
+                      <span className="font-semibold text-secondary-900">{po.purchaseOrderNumber}</span>
+                      {po.status === 'Approved' && po.convertedToBill && (
+                        <div className="text-xs text-green-600 mt-1">Converted to Bill</div>
+                      )}
                     </td>
                     <td className="py-4 px-6">
                       <div>
-                        <div className="font-medium text-secondary-900">{bill.contact?.contactName}</div>
-                        {bill.contact?.email && (
-                          <div className="text-sm text-secondary-600">{bill.contact.email}</div>
+                        <div className="font-medium text-secondary-900">{po.contact?.contactName}</div>
+                        {po.contact?.email && (
+                          <div className="text-sm text-secondary-600">{po.contact.email}</div>
                         )}
                       </div>
                     </td>
                     <td className="py-4 px-6">
                       <div className="flex items-center space-x-2 text-sm text-secondary-700">
                         <Calendar className="w-4 h-4 text-secondary-400" />
-                        <span>{formatDate(bill.issueDate)}</span>
+                        <span>{formatDate(po.issueDate)}</span>
                       </div>
                     </td>
                     <td className="py-4 px-6">
-                      <span className="font-semibold text-secondary-900">{formatCurrency(bill.grandTotal)}</span>
+                      <span className="font-semibold text-secondary-900">{formatCurrency(po.grandTotal)}</span>
                     </td>
                     <td className="py-2 px-3">
                       <select
-                        value={bill.status}
-                        onChange={(e) => handleStatusChange(bill._id, e.target.value)}
-                        className={`px-2 py-1 rounded text-xs font-semibold border-0 focus:outline-none focus:ring-1 focus:ring-red-500 ${getStatusClass(bill.status)}`}
+                        value={po.status}
+                        onChange={(e) => handleStatusChange(po._id, e.target.value)}
+                        className={`px-2 py-1 rounded text-xs font-semibold border-0 focus:outline-none focus:ring-1 focus:ring-indigo-500 ${getStatusClass(po.status)}`}
                       >
                         <option value="Draft">Draft</option>
                         <option value="Sent">Sent</option>
-                        <option value="Paid">Paid</option>
-                        <option value="Overdue">Overdue</option>
-                        <option value="Cancelled">Cancelled</option>
+                        <option value="Approved">Approved</option>
                       </select>
                     </td>
                     <td className="py-4 px-6">
                       <div className="flex items-center space-x-2">
                         <button
-                          onClick={() => handleEditBill(bill)}
-                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          onClick={() => handleEditPO(po)}
+                          className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
                           title="Edit"
                         >
                           <Edit className="w-5 h-5" />
                         </button>
                         <button
-                          onClick={() => handleDeleteBill(bill._id)}
+                          onClick={() => handleDeletePO(po._id)}
                           className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                           title="Delete"
                         >
@@ -689,10 +593,10 @@ const Bills = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-secondary-900">
-            {editingBill ? 'Edit Bill' : 'New Bill'}
+            {editingPO ? 'Edit Purchase Order' : 'New Purchase Order'}
           </h1>
           <p className="text-secondary-600 mt-1">
-            {editingBill ? 'Update bill details' : 'Create a new vendor bill'}
+            {editingPO ? 'Update purchase order details' : 'Create a new purchase order'}
           </p>
         </div>
       </div>
@@ -705,10 +609,10 @@ const Bills = () => {
       )}
 
       <div className="bg-white rounded-xl shadow-soft p-8">
-        {/* Bill Details */}
+        {/* PO Details */}
         <div className="mb-6">
-          <h2 className="text-xl font-bold text-secondary-900 mb-4">Bill Details</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <h2 className="text-xl font-bold text-secondary-900 mb-4">Purchase Order Details</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {/* Contact */}
             <div>
               <label className="block text-sm font-semibold text-secondary-700 mb-2">
@@ -722,7 +626,7 @@ const Bills = () => {
                   onFocus={() => handleContactSearch(contactSearchTerm || '')}
                   placeholder="Search vendor..."
                   required
-                  className="w-full px-4 py-2.5 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all text-secondary-900"
+                  className="w-full px-4 py-2.5 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all text-secondary-900"
                 />
                 {showContactDropdown && (
                   <div className="absolute z-50 w-full mt-1 bg-white border border-secondary-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
@@ -745,7 +649,7 @@ const Bills = () => {
                           setShowContactModal(true);
                           setShowContactDropdown(false);
                         }}
-                        className="w-full text-left px-4 py-2.5 hover:bg-red-50 text-sm flex items-center space-x-2 text-red-600 font-semibold"
+                        className="w-full text-left px-4 py-2.5 hover:bg-indigo-50 text-sm flex items-center space-x-2 text-indigo-600 font-semibold"
                       >
                         <Plus className="w-4 h-4" />
                         <span>Add "{contactSearchTerm}"</span>
@@ -766,21 +670,7 @@ const Bills = () => {
                 value={formData.issueDate}
                 onChange={(e) => setFormData({ ...formData, issueDate: e.target.value })}
                 required
-                className="w-full px-4 py-2.5 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 text-secondary-900"
-              />
-            </div>
-
-            {/* Due Date */}
-            <div>
-              <label className="block text-sm font-semibold text-secondary-700 mb-2">
-                Due Date <span className="text-red-600">*</span>
-              </label>
-              <input
-                type="date"
-                value={formData.dueDate}
-                onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
-                required
-                className="w-full px-4 py-2.5 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 text-secondary-900"
+                className="w-full px-4 py-2.5 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-secondary-900"
               />
             </div>
 
@@ -796,163 +686,28 @@ const Bills = () => {
                   calculateTotals(formData.lineItems);
                 }}
                 required
-                className="w-full px-4 py-2.5 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 text-secondary-900"
+                className="w-full px-4 py-2.5 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-secondary-900"
               >
                 <option value="Excluding">Tax Excluding</option>
                 <option value="Including">Tax Including</option>
                 <option value="No Tax">No Tax</option>
               </select>
             </div>
-          </div>
 
-          {/* Reference - Full Width */}
-          <div className="mt-4">
-            <label className="block text-sm font-semibold text-secondary-700 mb-2">
-              Reference
-            </label>
-            <input
-              type="text"
-              value={formData.reference}
-              onChange={(e) => setFormData({ ...formData, reference: e.target.value })}
-              placeholder="Optional reference"
-              className="w-full px-4 py-2.5 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 text-secondary-900"
-            />
-          </div>
-        </div>
-
-        {/* Payment Account Section - Compact */}
-        <div className="mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Payment Mode Selector */}
+            {/* Reference */}
             <div>
               <label className="block text-sm font-semibold text-secondary-700 mb-2">
-                Payment Mode
+                Reference
               </label>
-              <select
-                value={formData.useSplitPayment ? 'split' : 'single'}
-                onChange={(e) => {
-                  const isSplit = e.target.value === 'split';
-                  setFormData({
-                    ...formData,
-                    useSplitPayment: isSplit,
-                    paymentAccounts: isSplit
-                      ? [{ bankAccount: '', amount: formData.grandTotal }]
-                      : [{ bankAccount: '', amount: 0 }],
-                  });
-                }}
-                className="w-full px-4 py-2.5 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all text-secondary-900"
-              >
-                <option value="single">Single Account</option>
-                <option value="split">Split Payment</option>
-              </select>
+              <input
+                type="text"
+                value={formData.reference}
+                onChange={(e) => setFormData({ ...formData, reference: e.target.value })}
+                placeholder="Optional reference"
+                className="w-full px-4 py-2.5 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-secondary-900"
+              />
             </div>
-
-            {/* Single Bank Account or Split Payment Info */}
-            {!formData.useSplitPayment ? (
-              <div>
-                <label className="block text-sm font-semibold text-secondary-700 mb-2">
-                  Bank Account
-                </label>
-                <select
-                  value={formData.onlinePayment}
-                  onChange={(e) => setFormData({ ...formData, onlinePayment: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all text-secondary-900"
-                >
-                  <option value="">Select bank account (optional)</option>
-                  {bankAccounts.map((account) => (
-                    <option key={account._id} value={account._id}>
-                      {account.bankName} - {account.accountName}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ) : (
-              <div>
-                <label className="block text-sm font-semibold text-secondary-700 mb-2">
-                  Split Accounts
-                </label>
-                <div className="px-4 py-2.5 bg-blue-50 border border-blue-200 rounded-lg text-sm">
-                  <span className="font-semibold text-blue-900">
-                    {formData.paymentAccounts.filter(p => p.bankAccount).length} account(s) configured
-                  </span>
-                  <span className="text-blue-700 ml-2">
-                    {Math.abs(calculateRemainingAmount()) < 0.01 ? '(Complete)' : '(Incomplete)'}
-                  </span>
-                </div>
-              </div>
-            )}
           </div>
-
-          {/* Split Payment Details - Only shown when split mode is active */}
-          {formData.useSplitPayment && (
-            <div className="mt-4 p-4 bg-secondary-50 rounded-lg border border-secondary-200">
-              <div className="space-y-3">
-                {formData.paymentAccounts.map((payment, index) => (
-                  <div key={index} className="flex items-center space-x-3">
-                    <div className="flex-1">
-                      <select
-                        value={payment.bankAccount}
-                        onChange={(e) => handlePaymentAccountChange(index, 'bankAccount', e.target.value)}
-                        className="w-full px-3 py-2 bg-white border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 text-sm"
-                      >
-                        <option value="">Select bank account...</option>
-                        {bankAccounts.map((account) => (
-                          <option key={account._id} value={account._id}>
-                            {account.bankName} - {account.accountName}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="w-32">
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={payment.amount}
-                        onChange={(e) => handlePaymentAccountChange(index, 'amount', e.target.value)}
-                        placeholder="Amount"
-                        className="w-full px-3 py-2 bg-white border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 text-sm"
-                      />
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => handleRemovePaymentAccount(index)}
-                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                      title="Remove account"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
-
-                <button
-                  type="button"
-                  onClick={handleAddPaymentAccount}
-                  className="px-3 py-1.5 bg-white hover:bg-secondary-100 text-secondary-700 rounded-lg font-medium flex items-center space-x-1 transition-all text-sm border border-secondary-300"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Add Account</span>
-                </button>
-
-                {/* Compact Payment Summary */}
-                <div className="pt-3 border-t border-secondary-300 flex items-center justify-between text-sm">
-                  <div className="flex items-center space-x-4">
-                    <span className="text-secondary-700">
-                      Allocated: <span className="font-semibold text-secondary-900">
-                        {formatCurrency(formData.paymentAccounts.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0))}
-                      </span>
-                    </span>
-                    <span className="text-secondary-700">
-                      Total: <span className="font-semibold text-secondary-900">{formatCurrency(formData.grandTotal)}</span>
-                    </span>
-                  </div>
-                  <span className={`font-semibold ${Math.abs(calculateRemainingAmount()) < 0.01 ? 'text-green-600' : 'text-red-600'}`}>
-                    Remaining: {formatCurrency(calculateRemainingAmount())}
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Line Items Section */}
@@ -996,7 +751,7 @@ const Bills = () => {
                           onChange={(e) => handleItemSearch(index, e.target.value)}
                           onFocus={() => handleItemSearch(index, itemSearchTerms[index] || '')}
                           placeholder="Search item..."
-                          className="w-full px-3 py-2 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 text-sm"
+                          className="w-full px-3 py-2 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
                         />
                         {showItemDropdown[index] && (
                           <div className="absolute z-[100] w-full mt-1 bg-white border border-secondary-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
@@ -1019,7 +774,7 @@ const Bills = () => {
                                   setShowItemModal(true);
                                   setShowItemDropdown({ ...showItemDropdown, [index]: false });
                                 }}
-                                className="w-full text-left px-3 py-2 hover:bg-red-50 text-sm flex items-center space-x-2 text-red-600 font-semibold"
+                                className="w-full text-left px-3 py-2 hover:bg-indigo-50 text-sm flex items-center space-x-2 text-indigo-600 font-semibold"
                               >
                                 <Plus className="w-4 h-4" />
                                 <span>Add "{itemSearchTerms[index]}"</span>
@@ -1037,7 +792,7 @@ const Bills = () => {
                         value={line.description}
                         onChange={(e) => handleLineItemChange(index, 'description', e.target.value)}
                         placeholder="Description"
-                        className="w-full px-3 py-2 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 text-sm"
+                        className="w-full px-3 py-2 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
                       />
                     </td>
 
@@ -1050,7 +805,7 @@ const Bills = () => {
                         value={line.qty}
                         onChange={(e) => handleLineItemChange(index, 'qty', e.target.value)}
                         required
-                        className="w-20 px-3 py-2 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 text-sm"
+                        className="w-20 px-3 py-2 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
                       />
                     </td>
 
@@ -1063,7 +818,7 @@ const Bills = () => {
                         value={line.price}
                         onChange={(e) => handleLineItemChange(index, 'price', e.target.value)}
                         required
-                        className="w-24 px-3 py-2 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 text-sm"
+                        className="w-24 px-3 py-2 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
                       />
                     </td>
 
@@ -1075,7 +830,7 @@ const Bills = () => {
                         min="0"
                         value={line.discount}
                         onChange={(e) => handleLineItemChange(index, 'discount', e.target.value)}
-                        className="w-24 px-3 py-2 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 text-sm"
+                        className="w-24 px-3 py-2 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
                       />
                     </td>
 
@@ -1088,7 +843,7 @@ const Bills = () => {
                           onChange={(e) => handleAccountSearch(index, e.target.value)}
                           onFocus={() => handleAccountSearch(index, accountSearchTerms[index] || '')}
                           placeholder="Search account..."
-                          className="w-full px-3 py-2 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 text-sm"
+                          className="w-full px-3 py-2 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
                         />
                         {showAccountDropdown[index] && (
                           <div className="absolute z-[100] w-full mt-1 bg-white border border-secondary-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
@@ -1110,7 +865,7 @@ const Bills = () => {
                                   setShowAccountModal(true);
                                   setShowAccountDropdown({ ...showAccountDropdown, [index]: false });
                                 }}
-                                className="w-full text-left px-3 py-2 hover:bg-red-50 text-sm flex items-center space-x-2 text-red-600 font-semibold"
+                                className="w-full text-left px-3 py-2 hover:bg-indigo-50 text-sm flex items-center space-x-2 text-indigo-600 font-semibold"
                               >
                                 <Plus className="w-4 h-4" />
                                 <span>Add "{accountSearchTerms[index]}"</span>
@@ -1126,7 +881,7 @@ const Bills = () => {
                       <select
                         value={line.taxType}
                         onChange={(e) => handleLineItemChange(index, 'taxType', e.target.value)}
-                        className="w-full px-3 py-2 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 text-sm"
+                        className="w-full px-3 py-2 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
                       >
                         <option value="">No tax</option>
                         {taxTypes.map((tax) => (
@@ -1163,7 +918,7 @@ const Bills = () => {
                         <button
                           type="button"
                           onClick={handleAddLine}
-                          className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
                           title="Add line below"
                           tabIndex={0}
                         >
@@ -1200,7 +955,7 @@ const Bills = () => {
             <div className="border-t border-secondary-200 pt-3">
               <div className="flex justify-between items-center">
                 <span className="text-base font-bold text-secondary-900">Grand Total:</span>
-                <span className="text-2xl font-bold text-red-600">{formatCurrency(formData.grandTotal)}</span>
+                <span className="text-2xl font-bold text-indigo-600">{formatCurrency(formData.grandTotal)}</span>
               </div>
             </div>
           </div>
@@ -1218,20 +973,18 @@ const Bills = () => {
           <select
             value={selectedStatus}
             onChange={(e) => setSelectedStatus(e.target.value)}
-            className="px-3 py-2 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 text-sm font-semibold text-secondary-900"
+            className="px-3 py-2 bg-secondary-50 border border-secondary-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-semibold text-secondary-900"
           >
             <option value="Draft">Draft</option>
             <option value="Sent">Sent</option>
-            <option value="Paid">Paid</option>
-            <option value="Overdue">Overdue</option>
-            <option value="Cancelled">Cancelled</option>
+            <option value="Approved">Approved</option>
           </select>
           <button
             type="button"
             onClick={() => handleSubmit(selectedStatus)}
-            className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all text-sm"
+            className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all text-sm"
           >
-            Save Bill
+            Save Purchase Order
           </button>
         </div>
       </div>
@@ -1261,4 +1014,4 @@ const Bills = () => {
   );
 };
 
-export default Bills;
+export default PurchaseOrder;
