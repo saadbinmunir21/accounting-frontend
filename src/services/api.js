@@ -1,7 +1,7 @@
 // src/services/api.js
 import axios from 'axios';
 
-const API_BASE_URL = 'https://accounting-backend-uevd.onrender.com';
+const API_BASE_URL = 'https://accounting-backend-uevd.onrender.com/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,

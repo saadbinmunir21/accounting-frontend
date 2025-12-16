@@ -1,6 +1,9 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import axios from 'axios';
 
+// Base URL of deployed backend
+const API_BASE_URL = 'https://accounting-backend-uevd.onrender.com/api';
+
 const AuthContext = createContext(null);
 
 export const useAuth = () => {
@@ -28,7 +31,7 @@ export const AuthProvider = ({ children }) => {
 
   const loadUser = async () => {
     try {
-      const response = await axios.get('http://localhost:5000/api/users/profile');
+      const response = await axios.get(`${API_BASE_URL}/users/profile`);
       if (response.data.success) {
         setUser(response.data.data);
       }
@@ -42,7 +45,7 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (username, password) => {
     try {
-      const response = await axios.post('http://localhost:5000/api/users/login', {
+      const response = await axios.post(`${API_BASE_URL}/users/login`, {
         username,
         password
       });
@@ -66,7 +69,7 @@ export const AuthProvider = ({ children }) => {
 
   const register = async (userData) => {
     try {
-      const response = await axios.post('http://localhost:5000/api/users/register', userData);
+      const response = await axios.post(`${API_BASE_URL}/users/register`, userData);
 
       if (response.data.success) {
         const { token: newToken, user: newUser } = response.data.data;
@@ -94,7 +97,7 @@ export const AuthProvider = ({ children }) => {
 
   const updateProfile = async (profileData) => {
     try {
-      const response = await axios.patch('http://localhost:5000/api/users/profile', profileData);
+      const response = await axios.patch(`${API_BASE_URL}/users/profile`, profileData);
 
       if (response.data.success) {
         setUser(response.data.data);
@@ -111,7 +114,7 @@ export const AuthProvider = ({ children }) => {
 
   const changePassword = async (currentPassword, newPassword) => {
     try {
-      const response = await axios.patch('http://localhost:5000/api/users/change-password', {
+      const response = await axios.patch(`${API_BASE_URL}/users/change-password`, {
         currentPassword,
         newPassword
       });
